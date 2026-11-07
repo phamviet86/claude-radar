@@ -7,7 +7,7 @@ import { desktopSessionsDir, registryDir, SessionReader } from '../lib/read.js';
 import { createBoardServer } from '../server.js';
 
 function fixture() {
-  const root = mkdtempSync(join(tmpdir(), 'thread-board-'));
+  const root = mkdtempSync(join(tmpdir(), 'claude-radar-'));
   const desktop = join(root, 'claude-code-sessions', 'acct', 'org');
   const reg = join(root, 'sessions');
   mkdirSync(desktop, { recursive: true });
@@ -45,8 +45,8 @@ test('SessionReader: a missing folder only warns, no error', () => {
 test('default paths follow the operating system and environment variables', () => {
   assert.equal(desktopSessionsDir({}, 'darwin', '/h'), '/h/Library/Application Support/Claude/claude-code-sessions');
   assert.equal(desktopSessionsDir({ XDG_CONFIG_HOME: '/c' }, 'linux', '/h'), '/c/Claude/claude-code-sessions');
-  assert.equal(desktopSessionsDir({ THREAD_BOARD_DESKTOP: 'off' }, 'darwin', '/h'), null);
-  assert.equal(desktopSessionsDir({ THREAD_BOARD_DESKTOP: '/x' }, 'darwin', '/h'), '/x');
+  assert.equal(desktopSessionsDir({ CLAUDE_RADAR_DESKTOP: 'off' }, 'darwin', '/h'), null);
+  assert.equal(desktopSessionsDir({ CLAUDE_RADAR_DESKTOP: '/x' }, 'darwin', '/h'), '/x');
   assert.equal(registryDir({ CLAUDE_CONFIG_DIR: '/cfg' }, '/h'), '/cfg/sessions');
   assert.equal(registryDir({}, '/h'), '/h/.claude/sessions');
 });

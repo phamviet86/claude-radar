@@ -15,7 +15,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 app.on('window-all-closed', () => {}); // stay alive between pictures; the script quits itself
 
 app.whenReady().then(async () => {
-  const reader = new SessionReader(writeDemo(mkdtempSync(join(tmpdir(), 'thread-board-shots-'))));
+  const reader = new SessionReader(writeDemo(mkdtempSync(join(tmpdir(), 'claude-radar-shots-'))));
   const server = createBoardServer(reader);
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   const url = `http://127.0.0.1:${server.address().port}/`;

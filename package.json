@@ -1,7 +1,7 @@
 {
-  "name": "thread-board",
+  "name": "claude-radar",
   "version": "0.1.0",
-  "description": "Read-only Kanban board for Claude Code threads in Claude desktop",
+  "description": "A read-only radar for Claude Code threads in Claude desktop: what needs you, what is running, what is done",
   "type": "module",
   "private": true,
   "license": "MIT",
@@ -27,8 +27,8 @@
   },
   "main": "desktop/main.js",
   "build": {
-    "appId": "local.phamviet86.thread-board",
-    "productName": "Thread Board",
+    "appId": "local.phamviet86.claude-radar",
+    "productName": "Claude Radar",
     "files": [
       "server.js",
       "lib/**",

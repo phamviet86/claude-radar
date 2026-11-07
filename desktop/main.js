@@ -1,6 +1,7 @@
-// Thread Board as a Mac app: runs the local read-only server inside the app and shows the board window.
+// Claude Radar as a Mac app: runs the local read-only server inside the app and shows the board window.
 // Closing the window only hides it; the menu-bar icon shows INPUT and RUN and reopens the window on click.
 import { app, BrowserWindow, Menu, Tray, nativeImage, shell } from 'electron';
+import { existsSync, renameSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { createBoardServer } from '../server.js';
@@ -11,6 +12,16 @@ let win = null;
 let tray = null;
 let base = '';
 let quitting = false;
+
+// the app used to be called Thread Board: carry its settings folder (the saved filters) over to the new name
+const appData = app.getPath('appData');
+if (existsSync(join(appData, 'thread-board')) && !existsSync(join(appData, 'claude-radar'))) {
+  try {
+    renameSync(join(appData, 'thread-board'), join(appData, 'claude-radar'));
+  } catch {
+    /* expected when the folder is in use: the app starts with fresh settings */
+  }
+}
 
 if (!app.requestSingleInstanceLock()) app.quit();
 app.on('second-instance', () => showWindow());
@@ -35,7 +46,7 @@ function showWindow() {
 
 function createWindow() {
   win = new BrowserWindow({
-    width: 1240, height: 820, minWidth: 360, minHeight: 480, title: 'Thread Board', backgroundColor: '#040a14', show: false,
+    width: 1240, height: 820, minWidth: 360, minHeight: 480, title: 'Claude Radar', backgroundColor: '#040a14', show: false,
     titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 16, y: 18 },
     webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false },
   });
@@ -60,7 +71,7 @@ async function updateTray() {
     const n = { input: 0, work: 0 };
     for (const g of board.groups) for (const m of [g, ...g.children]) if (m.status in n) n[m.status] += 1;
     tray.setTitle(n.input || n.work ? ` ${n.input} · ${n.work}` : '');
-    tray.setToolTip(`Thread Board: ${n.input} need input, ${n.work} running`);
+    tray.setToolTip(`Claude Radar: ${n.input} need input, ${n.work} running`);
   } catch {
     // the built-in server could not be reached: show × in the menu bar
     tray.setTitle(' ×');
@@ -69,7 +80,7 @@ async function updateTray() {
 
 function buildMenu() {
   return Menu.buildFromTemplate([
-    { label: 'Show Thread Board', click: showWindow },
+    { label: 'Show Claude Radar', click: showWindow },
     { type: 'separator' },
     { label: 'Launch at login', type: 'checkbox', checked: app.getLoginItemSettings().openAtLogin, click: (i) => app.setLoginItemSettings({ openAtLogin: i.checked }) },
     { type: 'separator' },

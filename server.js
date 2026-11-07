@@ -76,5 +76,5 @@ export function createBoardServer(reader = new SessionReader(), now = Date.now) 
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const port = Number(process.env.PORT) || 4848;
-  createBoardServer().listen(port, '127.0.0.1', () => console.log(`Thread Board at http://127.0.0.1:${port}`));
+  createBoardServer().listen(port, '127.0.0.1', () => console.log(`Claude Radar at http://127.0.0.1:${port}`));
 }

@@ -20,7 +20,7 @@ const prefersReduced = () => matchMedia('(prefers-reduced-motion: reduce)').matc
 
 const state = { booted: false, folder: 'all', range: '1d', status: 'all', pinned: false, more: false, sel: null, member: null, timeline: null, data: null, raw: '' };
 try {
-  const saved = JSON.parse(localStorage.getItem('thread-board') || '{}');
+  const saved = JSON.parse(localStorage.getItem('claude-radar') ?? localStorage.getItem('thread-board') ?? '{}'); // 'thread-board' is the old name
   for (const k of ['folder', 'range', 'status']) if (typeof saved[k] === 'string') state[k] = saved[k];
   state.pinned = saved.pinned === true;
   if (state.range !== 'all' && !RANGES.some((r) => r[0] === state.range)) state.range = '1d';
@@ -28,7 +28,7 @@ try {
 } catch { /* no localStorage: use the defaults */ }
 const save = () => {
   try {
-    localStorage.setItem('thread-board', JSON.stringify({ folder: state.folder, range: state.range, status: state.status, pinned: state.pinned }));
+    localStorage.setItem('claude-radar', JSON.stringify({ folder: state.folder, range: state.range, status: state.status, pinned: state.pinned }));
   } catch { /* ignore */ }
 };
 

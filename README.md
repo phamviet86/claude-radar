@@ -1,4 +1,6 @@
-# Thread Board
+# Claude Radar
+
+*(formerly Thread Board)*
 
 A **read-only** Kanban board for Claude Code threads in **Claude desktop**: which threads need you, which are running, which are done, and what each project (folder) is up to.
 
@@ -34,7 +36,7 @@ npm run demo     # http://127.0.0.1:4868, a board of made-up threads (nothing re
 | `npm test` | Unit and server tests (`node --test`) |
 | `npm run check` | Type-checks `lib/` and `server.js` (JSDoc and `checkJs`, no build step; needs `npm install`) |
 | `npm run app` | Runs the Mac app straight from source |
-| `npm run build` | Builds `dist/mac-arm64/Thread Board.app` (see below) |
+| `npm run build` | Builds `dist/mac-arm64/Claude Radar.app` (see below) |
 | `npm run icons` | Regenerates the app icons (`desktop/make-icons.mjs`) |
 | `npm run screenshots` | Regenerates `docs/*.png` from the made-up data |
 
@@ -96,17 +98,17 @@ A thread is linked to its process by `hostSessionId` (then the CLI `sessionId`).
 There is no prebuilt download: build it yourself (about two minutes). Requirements: macOS, Node 22 or later, and the Xcode command line tools (`xcode-select --install`, for `sips` and `iconutil`).
 
 ```bash
-git clone https://github.com/phamviet86/thread-board.git
-cd thread-board
+git clone https://github.com/phamviet86/claude-radar.git
+cd claude-radar
 npm install          # installs Electron and electron-builder (dev-only; the board itself has no dependencies)
-npm run build        # -> dist/mac-arm64/Thread Board.app  (dist/mac-x64 on Intel Macs)
+npm run build        # -> dist/mac-arm64/Claude Radar.app  (dist/mac-x64 on Intel Macs)
 ```
 
-Then drag `Thread Board.app` from `dist/` into Applications and open it. The build is not code-signed or notarized; because you built it on your own Mac, macOS runs it without complaint. If you copy the `.app` to another Mac (AirDrop, zip) macOS will block it: run `xattr -cr "/Applications/Thread Board.app"` once, or build it on that Mac instead.
+Then drag `Claude Radar.app` from `dist/` into Applications and open it. The build is not code-signed or notarized; because you built it on your own Mac, macOS runs it without complaint. If you copy the `.app` to another Mac (AirDrop, zip) macOS will block it: run `xattr -cr "/Applications/Claude Radar.app"` once, or build it on that Mac instead.
 
-**What you get.** Opening the app shows the board window; closing the window only hides it. A radar icon on the menu bar shows the `INPUT · RUN` counts (refreshed every 2 seconds), opens the window on click, and its right-click menu has "Launch at login" and "Quit". The app runs the same read-only server inside itself on `127.0.0.1:4858` (a free port if that one is taken), so it can run next to `npm start` (port 4848). Its own settings (the saved filters) live in `~/Library/Application Support/thread-board`; it still writes nothing to Claude's data.
+**What you get.** Opening the app shows the board window; closing the window only hides it. A radar icon on the menu bar shows the `INPUT · RUN` counts (refreshed every 2 seconds), opens the window on click, and its right-click menu has "Launch at login" and "Quit". The app runs the same read-only server inside itself on `127.0.0.1:4858` (a free port if that one is taken), so it can run next to `npm start` (port 4848). Its own settings (the saved filters) live in `~/Library/Application Support/claude-radar`; it still writes nothing to Claude's data.
 
-**Troubleshooting.** If macOS asks whether Thread Board may access data from other apps, allow it: it reads Claude desktop's thread files. If the menu-bar counts show `×`, the built-in server could not be reached; quit and reopen the app.
+**Troubleshooting.** If macOS asks whether Claude Radar may access data from other apps, allow it: it reads Claude desktop's thread files. If the menu-bar counts show `×`, the built-in server could not be reached; quit and reopen the app.
 
 ## Known limits
 
@@ -121,7 +123,7 @@ Then drag `Thread Board.app` from `dist/` into Applications and open it. The bui
 | Variable | Effect |
 | --- | --- |
 | `PORT` | Port (default 4848; 4868 for `npm run demo`) |
-| `THREAD_BOARD_DESKTOP` | Claude desktop's thread directory; `off` to disable |
+| `CLAUDE_RADAR_DESKTOP` | Claude desktop's thread directory; `off` to disable |
 | `CLAUDE_CONFIG_DIR` | Claude Code config directory (default `~/.claude`) |
 
 ## Project layout
