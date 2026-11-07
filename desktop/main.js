@@ -89,7 +89,7 @@ app.whenReady().then(async () => {
   ]));
   createWindow();
   updateTray();
-  setInterval(updateTray, 5000);
+  setInterval(updateTray, 2000);
 });
 app.on('activate', showWindow);
 app.on('before-quit', () => { quitting = true; });

@@ -1,4 +1,4 @@
-// Read-only UI: fetches /api/board every 5 seconds and updates by thread id (keeps the existing DOM, never redraws the whole list).
+// Read-only UI: fetches /api/board every 2 seconds and updates by thread id (keeps the existing DOM, never redraws the whole list).
 // A single grid of cards, left to right: needs input first, then running, then done. Each card is tinted by its status.
 // A card that changes status slides to its new position (FLIP) and flashes briefly. Click a card to see its timeline.
 const STATUS_META = {
@@ -10,8 +10,7 @@ const STATUS_META = {
 const RANGES = [['1d', 'Today'], ['3d', '3 days']];
 const ORDER = { input: 0, work: 1, done: 2 };
 const DONE_CAP = 24;
-const THEMES = [['auto', 'Auto', 'monitor'], ['light', 'Light', 'sun'], ['dark', 'Dark', 'moon']];
-const POLL_MS = 5000;
+const POLL_MS = 2000;
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -19,17 +18,17 @@ const ui = (name) => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${LU
 document.querySelectorAll('svg[data-ic]').forEach((s) => { s.innerHTML = LUCIDE_UI[s.dataset.ic] ?? ''; });
 const prefersReduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-const state = { booted: false, folder: 'all', theme: 'auto', range: '1d', status: 'all', pinned: false, more: false, sel: null, member: null, timeline: null, data: null, raw: '' };
+const state = { booted: false, folder: 'all', range: '1d', status: 'all', pinned: false, more: false, sel: null, member: null, timeline: null, data: null, raw: '' };
 try {
   const saved = JSON.parse(localStorage.getItem('thread-board') || '{}');
-  for (const k of ['folder', 'theme', 'range', 'status']) if (typeof saved[k] === 'string') state[k] = saved[k];
+  for (const k of ['folder', 'range', 'status']) if (typeof saved[k] === 'string') state[k] = saved[k];
   state.pinned = saved.pinned === true;
   if (state.range !== 'all' && !RANGES.some((r) => r[0] === state.range)) state.range = '1d';
   if (!['all', 'input', 'work', 'done'].includes(state.status)) state.status = 'all';
 } catch { /* no localStorage: use the defaults */ }
 const save = () => {
   try {
-    localStorage.setItem('thread-board', JSON.stringify({ folder: state.folder, theme: state.theme, range: state.range, status: state.status, pinned: state.pinned }));
+    localStorage.setItem('thread-board', JSON.stringify({ folder: state.folder, range: state.range, status: state.status, pinned: state.pinned }));
   } catch { /* ignore */ }
 };
 
@@ -54,7 +53,7 @@ function span(ms) {
   return `${(s / 3600).toFixed(1).replace('.0', '')} h`;
 }
 
-/* ---- project tags: a Lucide icon and color per folder; stable by name, unique across the folders present ---- */
+/* ---- project tags: a Lucide icon per folder (stable by name, unique across the folders present); the color comes from CSS (status color on cards) ---- */
 const ICON_NAMES = Object.keys(LUCIDE);
 const hash = (s) => { let h = 2166136261; for (const ch of s) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0; return h; };
 let tags = new Map();
@@ -62,20 +61,18 @@ function assignTags(paths) {
   const key = paths.join('|');
   if (tags.key === key) return;
   const next = new Map(), used = new Set();
-  const byHash = [...paths].sort((a, b) => hash(a) - hash(b));
-  byHash.forEach((p, n) => next.set(p, { icon: -1, hue: Math.round((n * 360) / byHash.length + 24) % 360 }));
   for (const p of [...paths].sort()) {
     let i = hash(p) % ICON_NAMES.length;
     while (used.has(i) && used.size < ICON_NAMES.length) i = (i + 1) % ICON_NAMES.length;
     used.add(i);
-    next.get(p).icon = i;
+    next.set(p, { icon: i });
   }
   next.key = key;
   tags = next;
 }
 const tagEl = (path) => {
-  const t = tags.get(path) ?? { icon: hash(path) % ICON_NAMES.length, hue: hash(`${path}#`) % 360 };
-  return `<span class="tg" style="--tc:hsl(${t.hue} 62% 46%)" aria-hidden="true"><svg viewBox="0 0 24 24">${LUCIDE[ICON_NAMES[t.icon]]}</svg></span>`;
+  const t = tags.get(path) ?? { icon: hash(path) % ICON_NAMES.length };
+  return `<span class="tg" aria-hidden="true"><svg viewBox="0 0 24 24">${LUCIDE[ICON_NAMES[t.icon]]}</svg></span>`;
 };
 
 /* ---- open a thread in Claude desktop ---- */
@@ -105,7 +102,7 @@ function cardHtml(g) {
   // needs input: the full "Open in Claude" button (opens the exact thread that is waiting); otherwise just an icon button. Both sit to the left of the time.
   const open = g.status === 'input'
     ? openLink(g.leadId, 'Open in Claude')
-    : `<a class="open-sm" href="${esc(openUrl(g.id))}" aria-label="Open &quot;${esc(g.title)}&quot; in Claude" title="Open in Claude">${ui('external-link')}</a>`;
+    : `<a class="open-sm" href="${esc(openUrl(g.id))}" aria-label="Open &quot;${esc(g.title)}&quot; in Claude" title="Open in Claude"><span class="ot">Open in Claude</span>${ui('external-link')}</a>`;
   const run = g.status === 'work' && g.leadRun ? `<span class="runchip"><i class="led"></i>PID ${g.leadRun.pid}</span>` : '';
   const head = `<div class="chead"><span class="cs">${ui(STATUS_META[g.status].icon)}${{ input: 'NEEDS INPUT', work: 'RUNNING', done: 'DONE' }[g.status]}</span><span class="cid proj">${tagEl(g.path)}<span class="pn">${esc(g.folder)}</span></span></div>`;
   return `${head}<button class="main" data-id="${esc(g.id)}"><span class="title">${esc(g.title)}</span>${lineHtml(g)}</button>${kids}
@@ -114,6 +111,8 @@ function cardHtml(g) {
 
 const els = new Map();
 function flash(el) { el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); }
+/** The new status content fades in on top of the old color transition (the card's own animations are untouched). */
+function swap(el) { el.classList.remove('swap'); void el.offsetWidth; el.classList.add('swap'); setTimeout(() => el.classList.remove('swap'), 700); }
 /** Start (ms) of the selected time range; finished threads older than this are hidden. Needs-input and running threads always show. */
 function cutoff() {
   const d = new Date();
@@ -138,12 +137,19 @@ function messageEl(text) {
 /** Updates the grid by thread id. quiet = no effects (first render, filter change). */
 /**
  * Re-inserting a card or replacing its inner HTML (cards, top-bar counters) restarts the CSS animations inside it from
- * zero, which shows as a stutter on every sync. Pinning every endless animation on the page to the document timeline keeps
- * its phase continuous across those updates; only the card that changes status switches its own effects.
+ * zero, which shows as a stutter on every sync. Every endless animation is therefore pinned to a fixed start time, so its
+ * phase stays continuous across those updates:
+ * - inside a card, the start time is the moment that card entered its current status, so each card has its own rhythm
+ *   (a card that turned to "needs input" 2 seconds after another one has its beam 2 seconds behind it);
+ * - everywhere else (top-bar lamps, radar icon, background beam) it is the start of the page, so they stay in step.
  */
 function keepPhase() {
   for (const a of document.getAnimations()) {
-    if (a.effect?.getTiming().iterations === Infinity && a.startTime !== 0) a.startTime = 0;
+    if (a.effect?.getTiming().iterations !== Infinity) continue;
+    const card = /** @type {Element | null} */ (a.effect.target)?.closest?.('.card');
+    if (card?.classList.contains('ghost')) continue; // the copy of a removed card just fades out
+    const start = card ? (/** @type {any} */ (card)._epoch ?? 0) : 0;
+    if (a.startTime !== start) a.startTime = start;
   }
 }
 
@@ -160,6 +166,23 @@ function fadeOut(el, rect) {
   document.body.append(ghost);
   ghost.addEventListener('animationend', () => ghost.remove(), { once: true });
   setTimeout(() => ghost.remove(), 700);
+}
+
+/**
+ * Put the children of `host` in the order of `nodes`. moveBefore keeps a moved card's state (running animations and, above all,
+ * the status color transition, which would not start on a re-inserted element); without it, fall back to insertBefore.
+ * @param {HTMLElement} host
+ * @param {Node[]} nodes
+ */
+function place(host, nodes) {
+  const move = typeof host.moveBefore === 'function';
+  nodes.forEach((node, i) => {
+    const at = host.children[i] ?? null;
+    if (node === at) return;
+    if (move && node.parentNode === host) host.moveBefore(node, at);
+    else host.insertBefore(node, at);
+  });
+  while (host.children.length > nodes.length) host.lastElementChild?.remove();
 }
 
 function sync(quiet) {
@@ -184,10 +207,11 @@ function sync(quiet) {
     const html = cardHtml(g), sig = `${g.status}|${html}`;
     if (el.dataset.sig !== sig) {
       const changed = el.dataset.s && el.dataset.s !== g.status;
+      if (el.dataset.s !== g.status) /** @type {any} */ (el)._epoch = document.timeline.currentTime; // this card's own animation clock starts now
       el.innerHTML = html;
       el.dataset.sig = sig;
       el.dataset.s = g.status;
-      if (changed && !quiet) flash(el);
+      if (changed && !quiet) { flash(el); swap(el); }
     }
     if (g.status === 'done') {
       if (!state.more && doneShown >= DONE_CAP) continue;
@@ -207,7 +231,7 @@ function sync(quiet) {
   if (!list.length) frag.push(messageEl(all.length ? 'No threads match the filters.' : 'No threads to show yet.'));
   const cur = [...host.children];
   const same = cur.length === frag.length && cur.every((c, i) => c === frag[i] || (!els.has(c.dataset?.id ?? '') && c.className === frag[i].className && c.isEqualNode(frag[i])));
-  if (!same) host.replaceChildren(...frag);
+  if (!same) place(host, frag);
 
   for (const [id, el] of els) {
     if (seen.has(id)) continue;
@@ -223,18 +247,13 @@ function sync(quiet) {
       if (!a || !el.isConnected) continue;
       const b = el.getBoundingClientRect(), dx = a.left - b.left, dy = a.top - b.top;
       if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
-      el.style.transition = 'none';
-      el.style.transform = `translate(${dx}px, ${dy}px)`;
-      requestAnimationFrame(() => {
-        el.style.transition = 'transform .24s var(--ease-out)';
-        el.style.transform = '';
-        setTimeout(() => { el.style.transition = ''; }, 260);
-      });
+      // Web Animations instead of inline transitions: an inline `transition` would replace the stylesheet's list and cut the status color transition
+      el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }], { duration: 500, easing: 'cubic-bezier(.2, 0, 0, 1)' });
     }
   }
-  keepPhase();
   counts();
   for (const b of document.querySelectorAll('#range button')) b.setAttribute('aria-pressed', String(state.range === b.dataset.range));
+  keepPhase(); // last, after every DOM update above (counts() rebuilds the top-bar lamps)
 }
 
 function rangeBar() {
@@ -379,15 +398,6 @@ async function loadTimeline(id) {
   drawer();
 }
 
-/* ---- light/dark theme ---- */
-function applyTheme() {
-  if (state.theme === 'auto') document.documentElement.removeAttribute('data-theme');
-  else document.documentElement.setAttribute('data-theme', state.theme);
-  const [, name, ic] = THEMES.find((x) => x[0] === state.theme) ?? THEMES[0];
-  $('#themeTx').textContent = name;
-  $('#themeIc').innerHTML = LUCIDE_UI[ic];
-}
-
 /* ---- redraw ---- */
 function render(quiet) {
   assignTags((state.data?.folders ?? []).map((f) => f.path));
@@ -426,8 +436,10 @@ async function poll() {
     if (!res.ok) throw new Error(`server returned ${res.status}`);
     const data = JSON.parse(raw);
     setBanner((data.warnings || []).join(' '));
-    if (raw !== state.raw) {
-      state.raw = raw;
+    // generatedAt changes on every response, so compare without it: an unchanged board only refreshes the time labels
+    const same = raw.replace(/"generatedAt":\d+,?/, '') === state.raw;
+    if (!same) {
+      state.raw = raw.replace(/"generatedAt":\d+,?/, '');
       state.data = data;
       render(firstLoad);
       if (state.member) loadTimeline(state.member); // the open thread may have just got a new turn
@@ -464,12 +476,11 @@ document.addEventListener('click', (e) => {
     save();
     render(true);
   }
-  else if (b.id === 'theme') { state.theme = THEMES[(THEMES.findIndex((x) => x[0] === state.theme) + 1) % THEMES.length][0]; save(); applyTheme(); }
   else if (b.id === 'dclose' || b.id === 'scrim') closeDrawer();
 });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && state.sel) closeDrawer(); });
 
-applyTheme();
 render(true);
 poll();
-setInterval(poll, POLL_MS);
+// chained timeouts, not setInterval: a slow response never piles up requests
+(async function loop() { await poll(); setTimeout(loop, POLL_MS); })();

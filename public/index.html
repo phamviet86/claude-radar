@@ -10,17 +10,18 @@
 <div class="bg" aria-hidden="true"></div>
 
 <header class="topbar">
-  <div class="brand">
-    <svg class="i brand-ic" viewBox="0 0 24 24" data-ic="radar" aria-hidden="true"></svg>
-    <h1>THREAD BOARD</h1>
-  </div>
-  <div class="sb-counts" id="sb-counts" role="group" aria-label="Filter by status"></div>
-  <div class="tools">
+  <div class="left">
+    <div class="brand">
+      <svg class="i brand-ic" viewBox="0 0 24 24" data-ic="radar" aria-hidden="true"></svg>
+      <h1>THREAD BOARD</h1>
+    </div>
     <div class="sync" role="status" aria-label="Connection status">
       <span class="sb-item" id="sb-link"><i class="led live" id="sb-led"></i><b id="sb-state">CONNECTING</b></span>
-      <span class="sb-item"><span class="sb-k">SYNC</span><span id="stamp">--:--:--</span><span class="sb-dim">/ 5s</span></span>
+      <span class="sb-item"><span class="sb-k">SYNC</span><span id="stamp" title="Refreshes every 2 seconds">--:--:--</span></span>
     </div>
-    <button class="btn" id="theme" aria-label="Switch light or dark theme"><svg class="i" id="themeIc" viewBox="0 0 24 24" aria-hidden="true"></svg><span id="themeTx">Auto</span></button>
+  </div>
+  <div class="tools">
+    <div class="sb-counts" id="sb-counts" role="group" aria-label="Filter by status"></div>
   </div>
 </header>
 

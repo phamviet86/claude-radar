@@ -24,24 +24,6 @@
 /* "Sci-fi control panel" (HUD) look: deep navy background, thin glowing borders, chamfered corners, coordinate grid,
    faint scanlines, uppercase mono labels. Color = status: amber = needs you, blue = running, green = done, teal = system. */
 :root {
-  /* light: "daytime console" */
-  --bg: #e7eff6; --well: #d9e6f0; --card: #f4f9fd; --card-hi: #ffffff; --card-hover: #ffffff; --surface: #ffffff; --surface-2: #e3edf5; --surface-hover: #eef5fa;
-  --line: #bdd0df; --line-strong: #95b2c8; --hair: rgba(10, 70, 110, .16);
-  --fg: #0a1826; --muted: #3b546a; --faint: #587187;
-  --accent: #0a7ea4; --accent-soft: #d3eef7; --accent-glow: rgba(10, 126, 164, .35);
-  --input: #a14a05; --input-bar: #e88a0b; --input-bg: #fff0d9;
-  --work: #1a62cc; --work-bg: #dde9fb; --done: #0f7d57; --done-bg: #d7f2e6; --err: #c8323f;
-  --flash: rgba(232, 138, 11, .22);
-  --lift: 0 1px 2px rgba(10, 50, 90, .10); --lift-hover: 0 4px 14px -4px rgba(10, 80, 120, .35);
-  --sink: inset 0 2px 8px rgba(10, 50, 90, .10); --shadow-pop: 0 10px 40px rgba(10, 40, 70, .28);
-  --grid: rgba(10, 100, 150, .07); --grid2: rgba(10, 100, 150, .12); --glow-a: rgba(10, 126, 164, .10); --glow-b: rgba(232, 138, 11, .06); --scan: rgba(10, 60, 100, .025);
-  --card-tint: 12%; --card-tint-hover: 18%; --card-bd: 40%;
-  --on-bar: #ffffff; --bar: rgba(244, 249, 253, .82);
-  --f-display: "Chakra Petch", "Be Vietnam Pro", system-ui, sans-serif; --f-sans: var(--f-display); --f-mono: var(--f-display); --f-code: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  --ease-out: cubic-bezier(.2, 0, 0, 1); --ease-in: cubic-bezier(.4, 0, 1, 1);
-  color-scheme: light;
-}
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   /* dark: cockpit, deep navy and cyan edge lights */
   --bg: #040a14; --well: #02060d; --card: #0a1525; --card-hi: #0e1d33; --card-hover: #10233b; --surface: #0a1525; --surface-2: #11233a; --surface-hover: #0d1c30;
   --line: #1c3752; --line-strong: #2f5a7d; --hair: rgba(110, 205, 255, .20);
@@ -53,19 +35,10 @@
   --lift: 0 0 0 1px rgba(0, 0, 0, .4); --lift-hover: 0 0 22px -4px color-mix(in srgb, var(--c, var(--accent)) 60%, transparent);
   --sink: inset 0 3px 12px rgba(0, 0, 0, .6); --shadow-pop: 0 10px 50px rgba(0, 0, 0, .75);
   --grid: rgba(63, 200, 255, .06); --grid2: rgba(63, 200, 255, .11); --glow-a: rgba(30, 150, 255, .17); --glow-b: rgba(255, 176, 32, .05); --scan: rgba(160, 225, 255, .035);
-  --card-tint: 18%; --card-tint-hover: 26%; --card-bd: 58%; --on-bar: #1a0f00; --bar: rgba(4, 10, 20, .8); color-scheme: dark; } }
-:root[data-theme="dark"] {
-  --bg: #040a14; --well: #02060d; --card: #0a1525; --card-hi: #0e1d33; --card-hover: #10233b; --surface: #0a1525; --surface-2: #11233a; --surface-hover: #0d1c30;
-  --line: #1c3752; --line-strong: #2f5a7d; --hair: rgba(110, 205, 255, .20);
-  --fg: #e6f5ff; --muted: #a3c0d6; --faint: #7d9db4;
-  --accent: #3fe0ff; --accent-soft: #0b3a4d; --accent-glow: rgba(63, 224, 255, .5);
-  --input: #ffc24d; --input-bar: #ffb020; --input-bg: #3a2a08;
-  --work: #5aaaff; --work-bg: #102c4f; --done: #3be3a2; --done-bg: #0b3427; --err: #ff6b7a;
-  --flash: rgba(255, 176, 32, .30);
-  --lift: 0 0 0 1px rgba(0, 0, 0, .4); --lift-hover: 0 0 22px -4px color-mix(in srgb, var(--c, var(--accent)) 60%, transparent);
-  --sink: inset 0 3px 12px rgba(0, 0, 0, .6); --shadow-pop: 0 10px 50px rgba(0, 0, 0, .75);
-  --grid: rgba(63, 200, 255, .06); --grid2: rgba(63, 200, 255, .11); --glow-a: rgba(30, 150, 255, .17); --glow-b: rgba(255, 176, 32, .05); --scan: rgba(160, 225, 255, .035);
-  --card-tint: 18%; --card-tint-hover: 26%; --card-bd: 58%; --on-bar: #1a0f00; --bar: rgba(4, 10, 20, .8); color-scheme: dark; }
+  --card-tint: 18%; --card-tint-hover: 26%; --card-bd: 58%; --on-bar: #1a0f00; --bar: rgba(4, 10, 20, .8);   --f-display: "Chakra Petch", "Be Vietnam Pro", system-ui, sans-serif; --f-sans: var(--f-display); --f-mono: var(--f-display); --f-code: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --ease-out: cubic-bezier(.2, 0, 0, 1); --ease-in: cubic-bezier(.4, 0, 1, 1);
+  color-scheme: dark;
+}
 
 * { box-sizing: border-box; }
 html { height: 100%; }
@@ -83,6 +56,7 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 /* ---- top bar ---- */
 .topbar { position: sticky; top: 0; z-index: 15; display: flex; align-items: center; justify-content: space-between; gap: 12px 24px; flex-wrap: wrap; min-height: 48px; padding: 8px max(16px, env(safe-area-inset-left, 0px));
   background: var(--bar); backdrop-filter: blur(14px) saturate(1.3); -webkit-backdrop-filter: blur(14px) saturate(1.3); border-bottom: 1px solid var(--hair); }
+.left { display: flex; align-items: center; gap: 8px 22px; flex-wrap: wrap; min-width: 0; }
 .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .brand-ic { width: 20px; height: 20px; color: var(--accent); filter: drop-shadow(0 0 6px var(--accent-glow)); }
 h1 { font: 600 13px var(--f-mono); letter-spacing: .14em; margin: 0; }
@@ -97,9 +71,8 @@ h1 { font: 600 13px var(--f-mono); letter-spacing: .14em; margin: 0; }
 .sb-item { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .sb-item b { font-weight: 600; letter-spacing: .08em; color: var(--fg); }
 .sb-k { color: var(--faint); letter-spacing: .08em; }
-.sb-dim { color: var(--faint); }
 .sb-counts { display: inline-flex; flex-wrap: wrap; gap: 4px; }
-.topbar .sb-counts { margin: 0 auto 0 8px; }
+.topbar .sb-counts { margin: 0; }
 .topbar .sb-counts button { padding: 5px 12px; font-size: 12px; }
 .sb-counts button { all: unset; box-sizing: border-box; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; color: var(--muted); font: 400 11px var(--f-mono); letter-spacing: .04em; border: 1px solid transparent; transition: background-color .12s, color .12s, border-color .12s; }
 .sb-counts button b { font-weight: 600; color: var(--fg); }
@@ -109,6 +82,7 @@ h1 { font: 600 13px var(--f-mono); letter-spacing: .14em; margin: 0; }
 .sb-counts button .led { background: var(--c); box-shadow: none; animation: none; transition: box-shadow .2s; }
 .sb-counts button[data-lit="true"] .led { box-shadow: 0 0 9px var(--c); }
 .sb-counts button[data-lit="true"][data-status="input"] .led { animation: led 1.6s ease-in-out infinite; }
+.sb-counts button[data-lit="true"][data-status="work"] .led { animation: led 2.4s ease-in-out infinite; } /* the same rhythm as the border of a running card */
 .sb-counts button[data-lit="false"], .sb-counts button[data-lit="false"] b { color: var(--faint); }
 /* a lit lamp gets a border in the status color; an unlit lamp has a dim, flat border */
 .sb-counts button[data-lit="true"] { border-color: var(--c); background: color-mix(in srgb, var(--c) 9%, transparent); box-shadow: 0 0 12px -2px var(--c), inset 0 0 12px -6px var(--c); }
@@ -183,7 +157,7 @@ h1 { font: 600 13px var(--f-mono); letter-spacing: .14em; margin: 0; }
 .kid-btn .kt { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .kid-btn .kf { font: 500 10px var(--f-mono); color: var(--faint); white-space: nowrap; }
 .kid-btn .ks { font: 500 10.5px var(--f-mono); color: var(--c); white-space: nowrap; }
-.foot { display: flex; flex-direction: column; gap: 6px; margin-top: auto; padding-top: 8px; border-top: 1px dashed color-mix(in srgb, var(--c) 32%, transparent); }
+.foot { display: flex; flex-direction: column; gap: 6px; margin-top: auto; padding-top: 8px; }
 .fr-meta { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; min-height: 20px; }
 .fr-act { display: flex; align-items: center; gap: 10px; min-height: 26px; }
 .fr-act .badge.kc { display: inline-flex; gap: 5px; align-items: center; font: 500 11px var(--f-mono); color: var(--muted); background: color-mix(in srgb, var(--c) 12%, var(--surface-2)); border: 1px solid color-mix(in srgb, var(--c) 30%, var(--hair)); padding: 2px 8px; white-space: nowrap; }
@@ -363,9 +337,6 @@ h1 { font: 700 14px var(--f-display); letter-spacing: .26em; text-shadow: 0 0 14
 .card .runchip .led { width: 6px; height: 6px; }
 
 /* open-in-Claude button (not needs-input): Claude-orange border and icon, same height as the chips */
-.card .open-sm { --claude: #e0825e; width: 22px; height: 22px; color: var(--claude); border-color: color-mix(in srgb, var(--claude) 60%, transparent); background: color-mix(in srgb, var(--claude) 8%, transparent); }
-.card .open-sm svg { width: 12px; height: 12px; }
-.card .open-sm:hover { color: var(--claude); background: color-mix(in srgb, var(--claude) 28%, transparent); border-color: var(--claude); box-shadow: 0 0 12px -3px var(--claude); }
 .fr-act time { flex: none; }
 .fr-act { min-width: 0; }
 .fr-act .runchip { margin-left: auto; flex: none; }
@@ -376,13 +347,13 @@ h1 { font: 700 14px var(--f-display); letter-spacing: .26em; text-shadow: 0 0 14
 @media (max-width: 720px) {
   .topbar { gap: 8px 12px; padding-top: 10px; padding-bottom: 10px; }
   .tools { display: contents; }
+  .left { display: contents; }
   .brand { order: 1; }
-  #theme { order: 2; margin-left: auto; padding-inline: 9px; }
-  #themeTx { display: none; }
   .topbar .sb-counts { order: 3; flex: 1 0 100%; margin: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
   .topbar .sb-counts button { justify-content: center; }
-  .sync { order: 4; gap: 10px; padding: 0; }
-  .sync .sb-dim { display: none; }
+  .topbar { flex-wrap: wrap; }
+  .brand { flex: 0 1 auto; min-width: 0; }
+  .sync { order: 2; margin-left: auto; gap: 10px; padding: 0; flex: 0 0 auto; white-space: nowrap; }
   
   /* project chips and the time range share one flow: each row stretches to the full width so the right edge stays straight;
      the time range takes the spare room on the last row, or wraps to its own row if there is none */
@@ -417,14 +388,15 @@ h1 { font: 700 14px var(--f-display); letter-spacing: .26em; text-shadow: 0 0 14
 .work[open] > summary { margin-bottom: 10px; }
 .work > :not(summary) { margin-left: 24px; margin-bottom: 10px; }
 
-/* running cards: a light band sweeps across, the inner glow pulses, the status icon blinks */
-.card[data-s="work"]::before { content: ""; position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(105deg, transparent 38%, color-mix(in srgb, var(--c) 20%, transparent) 50%, transparent 62%) 0 0 / 260% 100%;
-  animation: sweep 3.4s linear infinite, runglow 2.2s ease-in-out infinite; }
-@keyframes sweep { from { background-position: 130% 0; } to { background-position: -130% 0; } }
-@keyframes runglow { 0%, 100% { box-shadow: inset 0 0 14px -6px var(--c); } 50% { box-shadow: inset 0 0 34px -4px var(--c); } }
-.card[data-s="work"] .cs svg { animation: led 1.4s ease-in-out infinite; }
-@media (prefers-reduced-motion: reduce) { .card[data-s="work"]::before, .card[data-s="work"] .cs svg { animation: none; } }
+/* running cards: the border brightens and softens again, endlessly */
+.card::before { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .8s ease;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 65%, transparent), inset 0 0 16px -5px var(--c); }
+.card[data-s="work"]::before { opacity: 1; animation: runglow 2.4s ease-in-out infinite; }
+@keyframes runglow {
+  0%, 100% { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 30%, transparent), inset 0 0 10px -6px color-mix(in srgb, var(--c) 40%, transparent); }
+  50% { box-shadow: inset 0 0 0 1px var(--c), inset 0 0 26px -4px var(--c); }
+}
+@media (prefers-reduced-motion: reduce) { .card[data-s="work"]::before { animation: none; } .card.swap > * { animation: none; } }
 
 /* smooth status color: --c is a real color, so a card eases from its old status color to the new one */
 @property --c { syntax: '<color>'; inherits: true; initial-value: transparent; }
@@ -435,3 +407,63 @@ h1 { font: 700 14px var(--f-display); letter-spacing: .26em; text-shadow: 0 0 14
 .card.ghost { position: fixed; margin: 0; z-index: 5; pointer-events: none; animation: leave .35s var(--ease-out) forwards; }
 @keyframes leave { to { opacity: 0; transform: scale(.94); } }
 @media (prefers-reduced-motion: reduce) { .card { transition: none; } .card.ghost { display: none; } }
+
+/* project icons carry no color of their own: on a card they follow the card's status color; in the filter they are plain
+   until selected, then they light up in the same color as the chip text */
+.tg { --tc: var(--muted); }
+.card .tg { --tc: var(--c); }
+.drawer .tg { --tc: var(--fg); }
+
+/* project icons have no frame, just the icon */
+.tg, .card[data-s="input"] .tg, .card .proj .tg { background: none; box-shadow: none; border: 0; }
+
+/* filter chips: the icon is just part of the label, same color and same glow as the text */
+.chip .tg { color: inherit; }
+.chip[aria-pressed="true"] .tg svg { filter: drop-shadow(0 0 8px var(--accent-glow)); }
+
+/* status change: the border flashes in the new status color (no brightness filter, which washes out light cards), the content fades in, and the card slides over half a second */
+.card.flash { animation: flash 1.2s var(--ease-out); }
+@keyframes flash { from { box-shadow: inset 0 0 0 2px var(--c), inset 0 0 34px 0 color-mix(in srgb, var(--c) 70%, transparent); } }
+.card.swap > * { animation: swapin .45s var(--ease-out); }
+@keyframes swapin { from { opacity: .15; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+/* needs input: a beam of light runs around the border (running cards pulse their border instead) */
+@property --beam { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+.card[data-s="input"]::before { content: ""; position: absolute; inset: 0; width: auto; height: auto; pointer-events: none; opacity: 1; box-shadow: none;
+  background: conic-gradient(from var(--beam), transparent 0deg 225deg, color-mix(in srgb, var(--c) 45%, transparent) 290deg, var(--c) 350deg, transparent 360deg);
+  /* a 3px ring that follows the chamfered outline, diagonals included: the outer polygon, then the inner one back the other way */
+  clip-path: polygon(evenodd,
+    0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, var(--cut) 100%, 0 calc(100% - var(--cut)), 0 0,
+    3px 3px, 3px calc(100% - var(--cut) - 1.24px), calc(var(--cut) + 1.24px) calc(100% - 3px), calc(100% - 3px) calc(100% - 3px),
+    calc(100% - 3px) calc(var(--cut) + 1.24px), calc(100% - var(--cut) - 1.24px) 3px, 3px 3px);
+  animation: beam 3.2s linear infinite; }
+@keyframes beam { to { --beam: 360deg; } }
+@media (prefers-reduced-motion: reduce) { .card[data-s="input"]::before { animation: none; display: none; } }
+
+/* very narrow screens: a smaller title and status so they still share one row, title left and status right */
+@media (max-width: 420px) {
+  .topbar h1 { font-size: 12px; letter-spacing: .14em; white-space: nowrap; }
+  .topbar .brand { gap: 7px; }
+  .topbar .brand-ic { width: 18px; height: 18px; }
+  .sync { gap: 7px; font-size: 10.5px; }
+  .sync .sb-k { display: none; }
+}
+
+/* project name and icon share one neutral color; the status colors stay on the status label, the border and the effects */
+.card .tg { color: var(--muted); }
+/* the secondary open button: as tall and as chamfered as the primary one, icon only and neutral; on hover it opens up to show
+   the label and fills with the card's status color (the primary button on a needs-input card is amber) */
+.card .open-sm { position: static; flex: none; display: inline-flex; align-items: center; justify-content: center; width: auto; height: 28px; min-width: 28px; padding: 0 7px;
+  overflow: hidden; white-space: nowrap; font: 600 12px var(--f-display); letter-spacing: .04em; border: 0;
+  clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px));
+  /* the 1px outline is an inset shadow; the clip-path cuts it at the two chamfers, so the diagonals are drawn as gradient lines */
+  --ob: color-mix(in srgb, var(--muted) 40%, transparent);
+  color: var(--muted); background-color: color-mix(in srgb, var(--muted) 10%, transparent); box-shadow: inset 0 0 0 1px var(--ob);
+  background-image: linear-gradient(to bottom left, transparent calc(50% - .75px), var(--ob) calc(50% - .75px) calc(50% + .75px), transparent calc(50% + .75px)), linear-gradient(to bottom left, transparent calc(50% - .75px), var(--ob) calc(50% - .75px) calc(50% + .75px), transparent calc(50% + .75px));
+  background-position: top right, bottom left; background-size: 7px 7px; background-repeat: no-repeat;
+  transition: background-color .2s, color .2s, box-shadow .2s, padding .3s var(--ease-out); }
+.card .open-sm svg { width: 13px; height: 13px; flex: none; }
+.card .open-sm .ot { max-width: 0; opacity: 0; margin-right: 0; overflow: hidden; transition: max-width .3s var(--ease-out), opacity .2s, margin-right .3s var(--ease-out); }
+.card .open-sm:hover, .card .open-sm:focus-visible { --ob: transparent; color: var(--on-bar); background-color: var(--c); box-shadow: none; padding: 0 14px 0 12px; }
+.card .open-sm:hover .ot, .card .open-sm:focus-visible .ot { max-width: 140px; opacity: 1; margin-right: 6px; }
+@media (prefers-reduced-motion: reduce) { .card .open-sm, .card .open-sm .ot { transition: none; } }
