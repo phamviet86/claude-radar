@@ -102,7 +102,7 @@ function cardHtml(g) {
   // needs input: the full "Open in Claude" button (opens the exact thread that is waiting); otherwise just an icon button. Both sit to the left of the time.
   const open = g.status === 'input'
     ? openLink(g.leadId, 'Open in Claude')
-    : `<a class="open-sm" href="${esc(openUrl(g.id))}" aria-label="Open &quot;${esc(g.title)}&quot; in Claude" title="Open in Claude"><span class="ot">Open in Claude</span>${ui('external-link')}</a>`;
+    : `<a class="open-sm" href="${esc(openUrl(g.id))}" aria-label="Open &quot;${esc(g.title)}&quot; in Claude"><span class="ot">Open in Claude</span>${ui('external-link')}</a>`;
   const run = g.status === 'work' && g.leadRun ? `<span class="runchip"><i class="led"></i>PID ${g.leadRun.pid}</span>` : '';
   const head = `<div class="chead"><span class="cs">${ui(STATUS_META[g.status].icon)}${{ input: 'NEEDS INPUT', work: 'RUNNING', done: 'DONE' }[g.status]}</span><span class="cid proj">${tagEl(g.path)}<span class="pn">${esc(g.folder)}</span></span></div>`;
   return `${head}<button class="main" data-id="${esc(g.id)}"><span class="title">${esc(g.title)}</span>${lineHtml(g)}</button>${kids}
@@ -347,7 +347,7 @@ function drawerHtml(g, m) {
     <div><h2>${esc(g.title)}</h2><div class="path">${tagEl(g.path)}${esc(g.path)}</div></div>
     <div class="idline"><span>ID <b>${esc(m.id)}</b></span>${(m.run ?? (m.id === g.id ? g.own?.run : null)) ? `<span>PID <b>${(m.run ?? g.own.run).pid}</b> · ${esc((m.run ?? g.own.run).status ?? '')}</span>` : ''}</div>
     ${asking?.detail ? `<div><p class="lbl">Waiting for you</p><div class="ask">${esc(asking.detail)}</div></div>` : ''}
-    <div>${openLink(m.id, m.status === 'input' ? 'Open in Claude to reply' : 'Open this thread in Claude')}</div>
+    <div style="--c:${STATUS_META[g.status].c}">${openLink(m.id, m.status === 'input' ? 'Open in Claude to reply' : 'Open this thread in Claude')}</div>
     ${all.length > 1 ? `<div><p class="lbl">Threads in this group</p><div class="members" role="tablist">${all.map((x) => `<button class="mem" role="tab" data-member="${esc(x.id)}" aria-selected="${x.id === m.id}" style="--c:${STATUS_META[x.status].c}"><span class="mst"></span>${esc(x.title)}<span class="ms">${STATUS_META[x.status].name}</span></button>`).join('')}</div></div>` : ''}
     ${summary}
     <div><p class="lbl">Timeline${all.length > 1 ? `: ${esc(m.title)}` : ''}</p>${timelineHtml(g, m)}</div>`;
