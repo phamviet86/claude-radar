@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseTranscript } from '../lib/timeline.js';
+import { headline, parseTranscript } from '../lib/timeline.js';
 
 const line = (o) => JSON.stringify(o);
 const T = (s) => `2026-11-07T10:00:${String(s).padStart(2, '0')}.000Z`;
@@ -98,4 +98,13 @@ test('timeline: keeps line breaks and markdown lists, cuts at a line boundary', 
 test('latestMessage: your message also loses markdown list marks', () => {
   const m = latestMessage(user(0, 'key points:\n* make it bigger\n* show markdown'));
   assert.equal(m.text, 'key points: make it bigger show markdown');
+});
+
+test('headline: first non-empty line of a reply without markdown marks, clipped', () => {
+  assert.equal(headline('\n## Fixed the login bug\n- more detail below'), 'Fixed the login bug');
+  assert.equal(headline('**Done.** All tests pass.'), 'Done. All tests pass.');
+  assert.equal(headline(''), '');
+  assert.ok(headline('x'.repeat(500)).length <= 140);
+  const { turns } = parseTranscript([user(0, 'go'), asst(1, [{ type: 'text', text: '## Result\n- fixed' }])].join('\n'));
+  assert.equal(turns[0].headline, 'Result');
 });

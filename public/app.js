@@ -6,7 +6,8 @@ const STATUS_META = {
   work: { name: 'Running', icon: 'circle-dot', c: 'var(--work)' },
   done: { name: 'Done', icon: 'circle-check', c: 'var(--done)' },
 };
-const RANGES = [['1d', 'Today'], ['3d', '3 days'], ['all', 'All']];
+// Today / 3 days toggle; neither selected = all
+const RANGES = [['1d', 'Today'], ['3d', '3 days']];
 const ORDER = { input: 0, work: 1, done: 2 };
 const DONE_CAP = 24;
 const THEMES = [['auto', 'Auto', 'monitor'], ['light', 'Light', 'sun'], ['dark', 'Dark', 'moon']];
@@ -18,17 +19,17 @@ const ui = (name) => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${LU
 document.querySelectorAll('svg[data-ic]').forEach((s) => { s.innerHTML = LUCIDE_UI[s.dataset.ic] ?? ''; });
 const prefersReduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-const state = { booted: false, tab: 'board', folder: 'all', theme: 'auto', range: '3d', status: 'all', pinned: false, more: false, sel: null, member: null, timeline: null, data: null, raw: '', pick: new Set() };
+const state = { booted: false, folder: 'all', theme: 'auto', range: '1d', status: 'all', pinned: false, more: false, sel: null, member: null, timeline: null, data: null, raw: '' };
 try {
   const saved = JSON.parse(localStorage.getItem('thread-board') || '{}');
-  for (const k of ['tab', 'folder', 'theme', 'range', 'status']) if (typeof saved[k] === 'string') state[k] = saved[k];
+  for (const k of ['folder', 'theme', 'range', 'status']) if (typeof saved[k] === 'string') state[k] = saved[k];
   state.pinned = saved.pinned === true;
-  if (!RANGES.some((r) => r[0] === state.range)) state.range = '3d';
+  if (state.range !== 'all' && !RANGES.some((r) => r[0] === state.range)) state.range = '1d';
   if (!['all', 'input', 'work', 'done'].includes(state.status)) state.status = 'all';
 } catch { /* no localStorage: use the defaults */ }
 const save = () => {
   try {
-    localStorage.setItem('thread-board', JSON.stringify({ tab: state.tab, folder: state.folder, theme: state.theme, range: state.range, status: state.status, pinned: state.pinned }));
+    localStorage.setItem('thread-board', JSON.stringify({ folder: state.folder, theme: state.theme, range: state.range, status: state.status, pinned: state.pinned }));
   } catch { /* ignore */ }
 };
 
@@ -135,6 +136,32 @@ function messageEl(text) {
 }
 
 /** Updates the grid by thread id. quiet = no effects (first render, filter change). */
+/**
+ * Re-inserting a card or replacing its inner HTML (cards, top-bar counters) restarts the CSS animations inside it from
+ * zero, which shows as a stutter on every sync. Pinning every endless animation on the page to the document timeline keeps
+ * its phase continuous across those updates; only the card that changes status switches its own effects.
+ */
+function keepPhase() {
+  for (const a of document.getAnimations()) {
+    if (a.effect?.getTiming().iterations === Infinity && a.startTime !== 0) a.startTime = 0;
+  }
+}
+
+/**
+ * A removed card fades out where it was, on a fixed-position copy, while the remaining cards slide into the gap.
+ * @param {Element} el
+ * @param {DOMRect | undefined} rect where the card was before this sync
+ */
+function fadeOut(el, rect) {
+  if (!rect) return;
+  const ghost = /** @type {HTMLElement} */ (el.cloneNode(true));
+  ghost.className = 'card ghost';
+  Object.assign(ghost.style, { left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px`, transform: '', transition: 'none' });
+  document.body.append(ghost);
+  ghost.addEventListener('animationend', () => ghost.remove(), { once: true });
+  setTimeout(() => ghost.remove(), 700);
+}
+
 function sync(quiet) {
   const all = groups();
   const list = boardList();
@@ -182,7 +209,12 @@ function sync(quiet) {
   const same = cur.length === frag.length && cur.every((c, i) => c === frag[i] || (!els.has(c.dataset?.id ?? '') && c.className === frag[i].className && c.isEqualNode(frag[i])));
   if (!same) host.replaceChildren(...frag);
 
-  for (const [id, el] of els) if (!seen.has(id)) { el.remove(); els.delete(id); }
+  for (const [id, el] of els) {
+    if (seen.has(id)) continue;
+    if (!quiet && !prefersReduced()) fadeOut(el, first.get(id));
+    el.remove();
+    els.delete(id);
+  }
   for (const [id, el] of els) { const g = list.find((x) => x.id === id); const t = el.querySelector('time'); if (g && t) t.textContent = ago(g.activityAt, true); }
 
   if (!quiet && !prefersReduced()) {
@@ -200,6 +232,7 @@ function sync(quiet) {
       });
     }
   }
+  keepPhase();
   counts();
   for (const b of document.querySelectorAll('#range button')) b.setAttribute('aria-pressed', String(state.range === b.dataset.range));
 }
@@ -215,60 +248,13 @@ function chips() {
   const host = $('#chips');
   const folders = state.data?.folders ?? [];
   if (state.folder !== 'all' && !folders.some((f) => f.path === state.folder)) { state.folder = 'all'; save(); }
-  const items = [['all', 'All'], ...folders.map((f) => [f.path, f.folder])];
+  const items = folders.map((f) => [f.path, f.folder]);
   const sig = items.map((i) => i.join(':')).join('|') + state.folder + state.pinned;
   if (host.dataset.sig === sig) return;
   host.dataset.sig = sig;
   const pinChip = `<button class="chip pinf" data-pinned aria-pressed="${state.pinned}" title="Show only pinned threads">${ui('pin')}Pinned</button><i class="chip-sep" aria-hidden="true"></i>`;
-  const chipHtml = items.map(([k, n]) => `<button class="chip ${k === 'all' ? 'all' : ''}" data-f="${esc(k)}" aria-pressed="${state.folder === k}">${k === 'all' ? '' : tagEl(k)}${esc(n)}</button>`).join('');
-  const cut = chipHtml.indexOf('</button>') + 9;
-  host.innerHTML = chipHtml.slice(0, cut) + pinChip + chipHtml.slice(cut);
-}
-
-/* ---- Projects tab: the project's threads on top, checkboxes to show only some threads' work, then "In progress" / "Finished" ---- */
-/** Every thread of a group (root, children, grandchildren) with each thread's own status. */
-function flat(g) {
-  const out = [{ id: g.id, title: g.title, depth: 0, ...g.own }];
-  const walk = (c, depth) => { out.push({ id: c.id, title: c.title, depth, status: c.status, detail: c.detail, stale: c.stale, latest: c.latest, activityAt: c.activityAt }); c.children.forEach((k) => walk(k, depth + 1)); };
-  g.children.forEach((c) => walk(c, 1));
-  return out;
-}
-/** Description line of a thread: the latest message while running, otherwise Claude's summary (if any). */
-const workText = (m) => (m.status === 'work' ? (m.latest?.text ?? m.detail) : (m.detail ?? m.latest?.text)) ?? '';
-const RANK = { input: 0, work: 1, done: 2 };
-
-function workItem(m) {
-  const text = workText(m);
-  return `<li class="witem" style="--c:${STATUS_META[m.status].c}"><span class="wic">${ui(STATUS_META[m.status].icon)}</span><div class="wbody"><button class="wt" data-id="${esc(m.id)}">${esc(m.title)}</button><p class="${text ? '' : 'nosum'}">${text ? esc(text) : 'No summary yet'}</p></div><time>${ago(m.activityAt, true)}</time></li>`;
-}
-
-function projectsHtml() {
-  const fs = (state.data?.folders ?? []).filter((f) => (state.folder === 'all' || f.path === state.folder) && (!state.pinned || groups().some((g) => g.path === f.path && g.starred)));
-  if (!fs.length) return `<div class="empty">${state.pinned ? 'No pinned threads.' : 'No projects.'}</div>`;
-  return fs.map((f) => {
-    const all = groups().filter((g) => g.path === f.path && (!state.pinned || g.starred)).flatMap(flat);
-    const picked = all.filter((m) => state.pick.has(m.id));
-    const shown = picked.length ? picked : all;
-    const doing = shown.filter((m) => m.status !== 'done').sort((a, b) => RANK[a.status] - RANK[b.status] || b.activityAt - a.activityAt);
-    const doneAll = shown.filter((m) => m.status === 'done').sort((a, b) => b.activityAt - a.activityAt);
-    const done = doneAll.slice(0, picked.length ? 20 : 6);
-    const stat = (k, label) => (f.count[k] ? `<span class="stat" style="--c:${STATUS_META[k].c}">${ui(STATUS_META[k].icon)}${f.count[k]} ${label}</span>` : '');
-    const rows = all.map((m) => `<div class="trow ${m.depth ? 'c' : ''}" style="--c:${STATUS_META[m.status].c}" ${m.depth > 1 ? `data-d="${m.depth}"` : ''}>
-        <input type="checkbox" data-pick="${esc(m.id)}" ${state.pick.has(m.id) ? 'checked' : ''} aria-label="Show only the work of thread ${esc(m.title)}">
-        <span class="tic" title="${STATUS_META[m.status].name}">${ui(STATUS_META[m.status].icon)}</span>
-        <button class="tn" data-id="${esc(m.id)}">${esc(m.title)}</button>
-        <time>${ago(m.activityAt, true)}</time>
-        <a class="open-sm row" href="${esc(openUrl(m.id))}" aria-label="Open &quot;${esc(m.title)}&quot; in Claude" title="Open in Claude">${ui('external-link')}</a>
-      </div>`).join('');
-    return `<article class="pcard">
-      <div class="p-head">${tagEl(f.path)}<div class="p-id"><h3>${esc(f.folder)}</h3><div class="p-path" title="${esc(f.path)}">${esc(f.path)}</div></div></div>
-      <div class="stats">${stat('input', 'needs input')}${stat('work', 'running')}${stat('done', 'done')}</div>
-      <section><p class="lbl">Threads in project · ${all.length}</p><div class="threads">${rows}</div></section>
-      ${picked.length ? `<div class="pickbar"><span>Showing the work of ${picked.length} threads</span><button class="link" data-clearpick="${esc(f.path)}">Clear selection</button></div>` : ''}
-      <section><p class="lbl">In progress · ${doing.length}</p>${doing.length ? `<ul class="wlist">${doing.map(workItem).join('')}</ul>` : '<p class="d">Nothing in progress.</p>'}</section>
-      <section><p class="lbl">Finished · ${doneAll.length}</p>${done.length ? `<ul class="wlist">${done.map(workItem).join('')}</ul>${doneAll.length > done.length ? `<p class="d more">and ${doneAll.length - done.length} more finished threads; tick a thread above to see it on its own.</p>` : ''}` : '<p class="d">No results yet.</p>'}</section>
-    </article>`;
-  }).join('');
+  const chipHtml = items.map(([k, n]) => `<button class="chip" data-f="${esc(k)}" aria-pressed="${state.folder === k}">${tagEl(k)}${esc(n)}</button>`).join('');
+  host.innerHTML = pinChip + chipHtml;
 }
 
 /* ---- small markdown for the timeline: paragraphs, lists, bold/italic, code, quotes, http(s) links. HTML is always escaped first. ---- */
@@ -320,7 +306,9 @@ function timelineHtml(g, m) {
   if (m.createdAt) events.push({ at: m.createdAt, html: '<div><span class="who">THREAD</span>Created</div>' });
   for (const t of tl?.turns ?? []) {
     const tools = t.tools.length ? `<div class="tools-row">${t.tools.slice(0, 8).map((x) => `<span class="tool">${esc(x.name)} ×${x.n}</span>`).join('')}${t.tools.length > 8 ? `<span class="tool">+${t.tools.length - 8}</span>` : ''}</div>` : '';
-    events.push({ at: t.at, html: `<div class="you"><span class="who">YOU</span><div class="md">${md(t.prompt)}</div></div>${tools}${t.reply ? `<div class="ai"><span class="who">CLAUDE</span><div class="md">${md(t.reply)}</div></div>` : ''}${t.durationMs > 20000 ? `<div class="dur">${span(t.durationMs)}</div>` : ''}` });
+    const dur = t.durationMs > 20000 ? `<span class="wm">${span(t.durationMs)}</span>` : '';
+    const toolCount = t.tools.reduce((a, x) => a + x.n, 0);
+    events.push({ at: t.at, work: true, html: `<details class="work"><summary><span class="wh">${esc(t.headline || t.prompt.split('\n')[0])}</span><span class="wm">${toolCount ? `${toolCount} tool calls` : ''}</span>${dur}</summary><div class="you"><span class="who">YOU</span><div class="md">${md(t.prompt)}</div></div>${tools}${t.reply ? `<div class="ai"><span class="who">CLAUDE</span><div class="md">${md(t.reply)}</div></div>` : ''}</details>` });
   }
   events.sort((a, b) => b.at - a.at);
   let note = '';
@@ -343,8 +331,7 @@ function drawerHtml(g, m) {
     <div>${openLink(m.id, m.status === 'input' ? 'Open in Claude to reply' : 'Open this thread in Claude')}</div>
     ${all.length > 1 ? `<div><p class="lbl">Threads in this group</p><div class="members" role="tablist">${all.map((x) => `<button class="mem" role="tab" data-member="${esc(x.id)}" aria-selected="${x.id === m.id}" style="--c:${STATUS_META[x.status].c}"><span class="mst"></span>${esc(x.title)}<span class="ms">${STATUS_META[x.status].name}</span></button>`).join('')}</div></div>` : ''}
     ${summary}
-    <div><p class="lbl">Timeline${all.length > 1 ? `: ${esc(m.title)}` : ''}</p>${timelineHtml(g, m)}</div>
-    <div class="hint">This page only shows status. The "Open in Claude" button uses the claude:// link of Claude desktop; if nothing happens, open the thread from Claude desktop's own list. Status is derived from Claude's automatic summaries, so it may not always be accurate.</div>`;
+    <div><p class="lbl">Timeline${all.length > 1 ? `: ${esc(m.title)}` : ''}</p>${timelineHtml(g, m)}</div>`;
 }
 
 function drawer() {
@@ -406,13 +393,7 @@ function render(quiet) {
   assignTags((state.data?.folders ?? []).map((f) => f.path));
   chips();
   rangeBar();
-  $('#range').style.display = state.tab === 'board' ? '' : 'none'; // the time range only applies to the board; the Projects tab does not use it
-  $('#tab-board').setAttribute('aria-selected', String(state.tab === 'board'));
-  $('#tab-proj').setAttribute('aria-selected', String(state.tab === 'proj'));
-  $('#board').hidden = state.tab !== 'board';
-  $('#projects').hidden = state.tab !== 'proj';
   sync(quiet);
-  if (state.tab === 'proj') $('#projects').innerHTML = projectsHtml();
   if (state.sel) drawer();
 }
 function setBanner(text) {
@@ -466,37 +447,23 @@ async function poll() {
   }
 }
 
-document.addEventListener('change', (e) => {
-  const c = e.target.closest?.('input[data-pick]');
-  if (!c) return;
-  if (c.checked) state.pick.add(c.dataset.pick); else state.pick.delete(c.dataset.pick);
-  $('#projects').innerHTML = projectsHtml();
-  $(`input[data-pick="${CSS.escape(c.dataset.pick)}"]`)?.focus({ preventScroll: true });
-});
 document.addEventListener('animationend', (e) => { e.target.classList?.remove('enter', 'flash'); });
 document.addEventListener('click', (e) => {
   const b = e.target.closest('button, #scrim');
   if (!b) return;
   if (b.hasAttribute('data-pinned')) { state.pinned = !state.pinned; state.more = false; save(); render(true); }
-  else if (b.dataset.f !== undefined) { state.folder = b.dataset.f; save(); render(true); }
-  else if (b.dataset.clearpick) {
-    for (const g of groups().filter((x) => x.path === b.dataset.clearpick)) for (const m of flat(g)) state.pick.delete(m.id);
-    $('#projects').innerHTML = projectsHtml();
-  }
+  else if (b.dataset.f !== undefined) { state.folder = state.folder === b.dataset.f ? 'all' : b.dataset.f; save(); render(true); }
   else if (b.dataset.more) { state.more = true; sync(true); }
-  else if (b.dataset.range) { state.range = b.dataset.range; state.more = false; save(); render(true); }
+  else if (b.dataset.range) { state.range = state.range === b.dataset.range ? 'all' : b.dataset.range; state.more = false; save(); render(true); }
   else if (b.dataset.member) { state.member = b.dataset.member; state.timeline = null; drawer(); loadTimeline(state.member); }
   else if (b.dataset.id) openDrawer(b.dataset.id);
   else if (b.dataset.status) {
     // click a count in the top bar: show only that status; click again to clear
     state.status = state.status === b.dataset.status ? 'all' : b.dataset.status;
     state.more = false;
-    if (state.tab !== 'board') state.tab = 'board';
     save();
     render(true);
   }
-  else if (b.id === 'tab-board') { state.tab = 'board'; save(); render(true); }
-  else if (b.id === 'tab-proj') { state.tab = 'proj'; save(); render(true); }
   else if (b.id === 'theme') { state.theme = THEMES[(THEMES.findIndex((x) => x[0] === state.theme) + 1) % THEMES.length][0]; save(); applyTheme(); }
   else if (b.id === 'dclose' || b.id === 'scrim') closeDrawer();
 });
