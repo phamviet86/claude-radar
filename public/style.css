@@ -428,7 +428,7 @@ h1 { font: 700 14px var(--f-display); letter-spacing: .26em; text-shadow: 0 0 14
 
 /* smooth status color: --c is a real color, so a card eases from its old status color to the new one */
 @property --c { syntax: '<color>'; inherits: true; initial-value: transparent; }
-.card { transition: filter .15s, transform .12s var(--ease-out), box-shadow .15s, --c .6s ease; }
+.card { transition: filter .15s, transform .12s var(--ease-out), box-shadow .15s, --c 1s ease; }
 /* a new card rises and fades in; a removed card fades out on a fixed copy (see fadeOut in app.js) */
 .card.enter { animation: enter .45s var(--ease-out); }
 @keyframes enter { from { opacity: 0; transform: translateY(12px) scale(.96); } to { opacity: 1; transform: none; } }
