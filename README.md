@@ -13,19 +13,24 @@ npm test
 
 Requires Node 22 or later. The server listens on `127.0.0.1` only and rejects other Host headers, so thread titles and summaries never leave your machine.
 
-## Mac app
+## Build the Mac app
 
-Besides `npm start`, Thread Board can run as a normal Mac app (Electron, development-only dependency; the board itself still has none):
+There is no prebuilt download: build it yourself (about two minutes). Requirements: macOS, Node 22 or later, and the Xcode command line tools (`xcode-select --install`, for `sips` and `iconutil`).
 
 ```bash
-npm install
-npm run build        # -> dist/mac-arm64/Thread Board.app   (build on each Mac; it is not code-signed)
-npm run app          # run from source without building
+git clone https://github.com/phamviet86/thread-board.git
+cd thread-board
+npm install          # installs Electron and electron-builder (dev-only; the board itself has no dependencies)
+npm run build        # -> dist/mac-arm64/Thread Board.app  (dist/mac-x64 on Intel Macs)
 ```
 
-A prebuilt, **unsigned** Apple-silicon build is attached to each [release](../../releases) as a zip. Unzip it, drag `Thread Board.app` to Applications and, because it is not notarized, clear the quarantine flag once: `xattr -cr "/Applications/Thread Board.app"` (or right-click → Open). Intel Macs: build from source.
+Then drag `Thread Board.app` from `dist/` into Applications and open it. The build is not code-signed or notarized; because you built it on your own Mac, macOS runs it without complaint. If you copy the `.app` to another Mac (AirDrop, zip) macOS will block it: run `xattr -cr "/Applications/Thread Board.app"` once, or build it on that Mac instead.
 
-Drag `Thread Board.app` to Applications. Opening it shows the board window; closing the window only hides it. A radar icon on the menu bar shows `INPUT · RUN` counts, opens the window on click, and its right-click menu has "Launch at login" and "Quit". The app runs the same read-only server inside itself on `127.0.0.1:4858` (falls back to a free port if taken), so it can run next to `npm start` (port 4848). Its own settings (filters, theme) live in `~/Library/Application Support/thread-board`; it still writes nothing to Claude's data. `npm run icons` regenerates the icons.
+Other scripts: `npm run app` runs the app straight from source without packaging; `npm run icons` regenerates the icons (`desktop/make-icons.mjs`).
+
+**What you get.** Opening the app shows the board window; closing the window only hides it. A radar icon on the menu bar shows the `INPUT · RUN` counts, opens the window on click, and its right-click menu has "Launch at login" and "Quit". The app runs the same read-only server inside itself on `127.0.0.1:4858` (a free port if that one is taken), so it can run next to `npm start` (port 4848). Its own settings (filters, theme) live in `~/Library/Application Support/thread-board`; it still writes nothing to Claude's data.
+
+**Troubleshooting.** If macOS asks whether Thread Board may access data from other apps, allow it: it reads Claude desktop's thread files. If the menu-bar counts show `×`, the built-in server could not be reached; quit and reopen the app.
 
 ## Interface
 
