@@ -1,4 +1,4 @@
-// icon.png (1024) -> icon.icns, só no macOS (sips + iconutil). Chamado por `npm run build`.
+// icon.png (1024) -> icon.icns, macOS only (sips + iconutil). Called by `npm run build`.
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';

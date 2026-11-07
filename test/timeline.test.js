@@ -7,95 +7,95 @@ const T = (s) => `2026-11-07T10:00:${String(s).padStart(2, '0')}.000Z`;
 const user = (s, content, extra = {}) => line({ type: 'user', timestamp: T(s), message: { role: 'user', content }, ...extra });
 const asst = (s, content, extra = {}) => line({ type: 'assistant', timestamp: T(s), message: { role: 'assistant', content }, ...extra });
 
-test('timeline: mỗi lượt gồm lời bạn nhắn, công cụ đã dùng và câu trả lời cuối', () => {
+test('timeline: each turn has your message, the tools used and the final answer', () => {
   const text = [
-    user(0, 'sửa lỗi đăng nhập'),
-    asst(2, [{ type: 'thinking', thinking: 'bí mật' }, { type: 'tool_use', name: 'Read', input: { file: '/a' } }]),
-    user(3, [{ type: 'tool_result', content: 'nội dung tệp rất dài' }]),
+    user(0, 'fix the login bug'),
+    asst(2, [{ type: 'thinking', thinking: 'secret' }, { type: 'tool_use', name: 'Read', input: { file: '/a' } }]),
+    user(3, [{ type: 'tool_result', content: 'very long file contents' }]),
     asst(5, [{ type: 'tool_use', name: 'Edit', input: {} }, { type: 'tool_use', name: 'Edit', input: {} }, { type: 'tool_use', name: 'mcp__srv__tim_kiem', input: {} }]),
-    asst(8, [{ type: 'text', text: 'Đã sửa xong.' }]),
-    user(30, 'chạy thử giúp'),
-    asst(40, [{ type: 'text', text: 'Test đều qua.' }]),
+    asst(8, [{ type: 'text', text: 'Fixed.' }]),
+    user(30, 'please run it'),
+    asst(40, [{ type: 'text', text: 'All tests pass.' }]),
   ].join('\n');
   const { turns, omitted } = parseTranscript(text);
   assert.equal(omitted, 0);
   assert.equal(turns.length, 2);
-  assert.equal(turns[0].prompt, 'chạy thử giúp'); // mới nhất trước
-  assert.equal(turns[0].reply, 'Test đều qua.');
-  assert.equal(turns[1].prompt, 'sửa lỗi đăng nhập');
-  assert.equal(turns[1].reply, 'Đã sửa xong.');
+  assert.equal(turns[0].prompt, 'please run it'); // newest first
+  assert.equal(turns[0].reply, 'All tests pass.');
+  assert.equal(turns[1].prompt, 'fix the login bug');
+  assert.equal(turns[1].reply, 'Fixed.');
   assert.deepEqual(turns[1].tools, [{ name: 'Edit', n: 2 }, { name: 'Read', n: 1 }, { name: 'tim_kiem', n: 1 }]);
   assert.equal(turns[1].durationMs, 8000);
 });
 
-test('timeline: không giữ suy nghĩ, kết quả công cụ hay nội dung công cụ', () => {
+test('timeline: keeps no thinking, tool results or tool contents', () => {
   const text = [user(0, 'hi'), asst(1, [{ type: 'thinking', thinking: 'MẬT-1' }, { type: 'tool_use', name: 'Bash', input: { command: 'MẬT-2' } }]), user(2, [{ type: 'tool_result', content: 'MẬT-3' }])].join('\n');
   assert.ok(!JSON.stringify(parseTranscript(text)).includes('MẬT'));
 });
 
-test('timeline: bỏ thread phụ, thông báo hệ thống, dòng hỏng; lệnh gạch chéo thành "Lệnh …"', () => {
+test('timeline: skips side threads, system notices and broken lines; slash commands become "Command …"', () => {
   const text = [
-    '{hỏng',
-    user(0, '<system-reminder>ẩn</system-reminder>'),
-    user(1, 'nhắn thật'),
-    asst(2, [{ type: 'text', text: 'của thread phụ' }], { isSidechain: true }),
-    user(3, 'thông báo', { isMeta: true }),
+    '{broken',
+    user(0, '<system-reminder>hidden</system-reminder>'),
+    user(1, 'real message'),
+    asst(2, [{ type: 'text', text: 'from a side thread' }], { isSidechain: true }),
+    user(3, 'notice', { isMeta: true }),
     user(4, '<command-name>/compact</command-name><command-args></command-args>'),
   ].join('\n');
   const { turns } = parseTranscript(text);
-  assert.deepEqual(turns.map((t) => t.prompt), ['Command /compact', 'nhắn thật']);
+  assert.deepEqual(turns.map((t) => t.prompt), ['Command /compact', 'real message']);
   assert.equal(turns[1].reply, '');
 });
 
-test('timeline: cắt ngắn văn bản dài và giới hạn số lượt', () => {
+test('timeline: clips long text and limits the number of turns', () => {
   const long = 'x'.repeat(2000);
-  const many = Array.from({ length: 5 }, (_, i) => user(i, `lượt ${i}`) + '\n' + asst(i, [{ type: 'text', text: long }])).join('\n');
+  const many = Array.from({ length: 5 }, (_, i) => user(i, `turn ${i}`) + '\n' + asst(i, [{ type: 'text', text: long }])).join('\n');
   const { turns, omitted } = parseTranscript(many, 3);
   assert.equal(turns.length, 3);
   assert.equal(omitted, 2);
   assert.ok(turns[0].reply.length <= 1600);
-  assert.equal(turns[0].prompt, 'lượt 4');
+  assert.equal(turns[0].prompt, 'turn 4');
 });
 
 import { latestMessage } from '../lib/timeline.js';
 
-test('latestMessage: lấy tin mới nhất, bỏ markdown, bỏ thread phụ và suy nghĩ', () => {
+test('latestMessage: takes the latest message, strips markdown, skips side threads and thinking', () => {
   const text = [
-    user(0, 'làm giúp tôi'),
-    asst(2, [{ type: 'text', text: '## Kết quả\n- **Đã sửa** `lib/a.js`\n```js\ncode\n```' }]),
+    user(0, 'do this for me'),
+    asst(2, [{ type: 'text', text: '## Result\n- **Fixed** `lib/a.js`\n```js\ncode\n```' }]),
     asst(5, [{ type: 'thinking', thinking: 'MẬT' }, { type: 'tool_use', name: 'Bash', input: {} }]),
-    asst(6, [{ type: 'text', text: 'ẩn' }], { isSidechain: true }),
+    asst(6, [{ type: 'text', text: 'hidden' }], { isSidechain: true }),
   ].join('\n');
   const m = latestMessage(text);
   assert.equal(m.role, 'assistant');
-  assert.equal(m.text, 'Kết quả Đã sửa lib/a.js');
+  assert.equal(m.text, 'Result Fixed lib/a.js');
   assert.ok(!JSON.stringify(m).includes('MẬT'));
 });
 
-test('latestMessage: tin của bạn mới hơn thì hiện tin của bạn; rỗng thì null', () => {
-  const text = [asst(1, [{ type: 'text', text: 'trả lời cũ' }]), user(9, 'câu hỏi mới')].join('\n');
-  assert.deepEqual(latestMessage(text), { role: 'user', at: Date.parse(T(9)), text: 'câu hỏi mới' });
+test('latestMessage: your message shows if it is newer; empty gives null', () => {
+  const text = [asst(1, [{ type: 'text', text: 'old answer' }]), user(9, 'new question')].join('\n');
+  assert.deepEqual(latestMessage(text), { role: 'user', at: Date.parse(T(9)), text: 'new question' });
   assert.equal(latestMessage(''), null);
-  assert.equal(latestMessage('{hỏng\n'), null);
+  assert.equal(latestMessage('{broken\n'), null);
 });
 
-test('latestMessage: cắt ngắn tin dài', () => {
+test('latestMessage: clips a long message', () => {
   const m = latestMessage(asst(1, [{ type: 'text', text: 'a '.repeat(500) }]));
   assert.ok(m.text.length <= 240);
 });
 
-test('timeline: giữ xuống dòng và danh sách markdown, cắt ở ranh giới dòng', () => {
-  const reply = '**Thay đổi:**\n- Một\n- Hai\n\n\n\nCuối';
-  const { turns } = parseTranscript([user(0, 'dòng 1\r\ndòng 2'), asst(1, [{ type: 'text', text: reply }])].join('\n'));
-  assert.equal(turns[0].prompt, 'dòng 1\ndòng 2');
-  assert.equal(turns[0].reply, '**Thay đổi:**\n- Một\n- Hai\n\nCuối');
-  const long = Array.from({ length: 400 }, (_, i) => `- mục số ${i}`).join('\n');
+test('timeline: keeps line breaks and markdown lists, cuts at a line boundary', () => {
+  const reply = '**Changes:**\n- One\n- Two\n\n\n\nEnd';
+  const { turns } = parseTranscript([user(0, 'line 1\r\nline 2'), asst(1, [{ type: 'text', text: reply }])].join('\n'));
+  assert.equal(turns[0].prompt, 'line 1\nline 2');
+  assert.equal(turns[0].reply, '**Changes:**\n- One\n- Two\n\nEnd');
+  const long = Array.from({ length: 400 }, (_, i) => `- item ${i}`).join('\n');
   const cut = parseTranscript([user(0, 'x'), asst(1, [{ type: 'text', text: long }])].join('\n')).turns[0].reply;
   assert.ok(cut.length <= 1600 && cut.endsWith('…'));
-  assert.ok(/mục số \d+…$/.test(cut)); // cắt ở cuối một dòng, không giữa chừng
+  assert.ok(/item \d+…$/.test(cut)); // cut at the end of a line, not in the middle
 });
 
-test('latestMessage: tin của bạn cũng bỏ ký hiệu danh sách markdown', () => {
-  const m = latestMessage(user(0, 'ý chính:\n* cho to ra\n* hiển thị markdown'));
-  assert.equal(m.text, 'ý chính: cho to ra hiển thị markdown');
+test('latestMessage: your message also loses markdown list marks', () => {
+  const m = latestMessage(user(0, 'key points:\n* make it bigger\n* show markdown'));
+  assert.equal(m.text, 'key points: make it bigger show markdown');
 });

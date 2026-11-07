@@ -1,13 +1,15 @@
-// Thread Board como app de Mac: abre o servidor local (somente leitura) dentro do próprio app e mostra a janela do quadro.
-// Fechar a janela só a esconde; o ícone na barra de menus mostra INPUT e RUN e reabre a janela com um clique.
+// Thread Board as a Mac app: runs the local read-only server inside the app and shows the board window.
+// Closing the window only hides it; the menu-bar icon shows INPUT and RUN and reopens the window on click.
 import { app, BrowserWindow, Menu, Tray, nativeImage, shell } from 'electron';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { createBoardServer } from '../server.js';
 
 const dir = fileURLToPath(new URL('.', import.meta.url));
-const PORT = Number(process.env.PORT) || 4858; // porta fixa: o localStorage (filtros salvos) depende da origem
-let win = null, tray = null, base = '';
+const PORT = Number(process.env.PORT) || 4858; // fixed port: localStorage (saved filters) is tied to the origin
+let win = null;
+let tray = null;
+let base = '';
 let quitting = false;
 
 if (!app.requestSingleInstanceLock()) app.quit();
@@ -38,14 +40,14 @@ function createWindow() {
     webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false },
   });
   win.once('ready-to-show', () => win.show());
-  // só no app: a barra de cima vira a barra de título (arrasta a janela) e deixa espaço para os botões vermelho/amarelo/verde
+  // app only: the top bar becomes the title bar (drags the window) and leaves room for the red/yellow/green buttons
   win.webContents.on('did-finish-load', () => win.webContents.insertCSS(`
     .topbar { -webkit-app-region: drag; }
     .topbar button, .topbar a, .topbar .tabs, .topbar .sb-counts { -webkit-app-region: no-drag; }
     .topbar .brand { margin-left: 72px; }
     @media (max-width: 720px) { .topbar .brand { margin-left: 72px; } }`));
   win.loadURL(base);
-  // links claude://... e externos abrem fora do app; a janela nunca sai do servidor local
+  // claude://... and external links open outside the app; the window never leaves the local server
   const external = (url) => !url.startsWith(base);
   win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
   win.webContents.on('will-navigate', (e, url) => { if (external(url)) { e.preventDefault(); shell.openExternal(url); } });
@@ -59,7 +61,10 @@ async function updateTray() {
     for (const g of board.groups) for (const m of [g, ...g.children]) if (m.status in n) n[m.status] += 1;
     tray.setTitle(n.input || n.work ? ` ${n.input} · ${n.work}` : '');
     tray.setToolTip(`Thread Board: ${n.input} need input, ${n.work} running`);
-  } catch { tray.setTitle(' ×'); }
+  } catch {
+    // the built-in server could not be reached: show × in the menu bar
+    tray.setTitle(' ×');
+  }
 }
 
 function buildMenu() {
@@ -88,4 +93,4 @@ app.whenReady().then(async () => {
 });
 app.on('activate', showWindow);
 app.on('before-quit', () => { quitting = true; });
-app.on('window-all-closed', () => { /* continua na barra de menus */ });
+app.on('window-all-closed', () => { /* keep running in the menu bar */ });

@@ -13,14 +13,14 @@ function fixture() {
   mkdirSync(desktop, { recursive: true });
   mkdirSync(reg, { recursive: true });
   writeFileSync(join(desktop, 'local_a.json'), JSON.stringify({ sessionId: 'local_a', title: 'A', cwd: '/w/p', lastActivityAt: 10, postTurnSummary: { status_category: 'completed', status_detail: 'xong' } }));
-  writeFileSync(join(desktop, 'local_b.json'), '{hỏng');
+  writeFileSync(join(desktop, 'local_b.json'), '{broken');
   writeFileSync(join(desktop, 'khac.json'), JSON.stringify({ sessionId: 'local_x' }));
   writeFileSync(join(reg, '100.json'), JSON.stringify({ pid: 100, hostSessionId: 'local_a', status: 'busy' }));
   writeFileSync(join(reg, '200.json'), JSON.stringify({ pid: 200, hostSessionId: 'local_z', status: 'busy' }));
   return { root, desktopDir: join(root, 'claude-code-sessions'), registryDir: reg };
 }
 
-test('SessionReader: đọc thread, bỏ tệp hỏng và tiến trình đã chết', () => {
+test('SessionReader: reads threads, skips broken files and dead processes', () => {
   const f = fixture();
   try {
     const r = new SessionReader({ desktopDir: f.desktopDir, registryDir: f.registryDir, isAlive: (pid) => pid === 100 });
@@ -28,21 +28,21 @@ test('SessionReader: đọc thread, bỏ tệp hỏng và tiến trình đã ch�
     assert.deepEqual(out.desktop.map((t) => t.id), ['local_a']);
     assert.deepEqual(out.registry.map((e) => e.pid), [100]);
     assert.deepEqual(out.warnings, []);
-    assert.equal(r.read().desktop.length, 1); // lần hai dùng cache
+    assert.equal(r.read().desktop.length, 1); // the second read uses the cache
   } finally {
     rmSync(f.root, { recursive: true, force: true });
   }
 });
 
-test('SessionReader: thiếu thư mục chỉ cảnh báo, không lỗi', () => {
-  const r = new SessionReader({ desktopDir: '/không/có/đâu', registryDir: '/cũng/không/có' });
+test('SessionReader: a missing folder only warns, no error', () => {
+  const r = new SessionReader({ desktopDir: '/does/not/exist', registryDir: '/also/not/there' });
   const out = r.read();
   assert.deepEqual(out.desktop, []);
   assert.equal(out.warnings.length, 2);
   assert.equal(new SessionReader({ desktopDir: null, registryDir: '/x' }).read().warnings[0].includes('turned off'), true);
 });
 
-test('đường dẫn mặc định theo hệ điều hành và biến môi trường', () => {
+test('default paths follow the operating system and environment variables', () => {
   assert.equal(desktopSessionsDir({}, 'darwin', '/h'), '/h/Library/Application Support/Claude/claude-code-sessions');
   assert.equal(desktopSessionsDir({ XDG_CONFIG_HOME: '/c' }, 'linux', '/h'), '/c/Claude/claude-code-sessions');
   assert.equal(desktopSessionsDir({ THREAD_BOARD_DESKTOP: 'off' }, 'darwin', '/h'), null);
@@ -51,7 +51,7 @@ test('đường dẫn mặc định theo hệ điều hành và biến môi trư
   assert.equal(registryDir({}, '/h'), '/h/.claude/sessions');
 });
 
-test('máy chủ: chỉ đọc, từ chối Host lạ, phục vụ /api/board', async () => {
+test('server: read-only, rejects a foreign Host, serves /api/board', async () => {
   const f = fixture();
   const reader = new SessionReader({ desktopDir: f.desktopDir, registryDir: f.registryDir, isAlive: () => true });
   const server = createBoardServer(reader, () => 1_000_000);
@@ -60,7 +60,7 @@ test('máy chủ: chỉ đọc, từ chối Host lạ, phục vụ /api/board', 
   try {
     const board = await (await fetch(`${base}/api/board`)).json();
     assert.equal(board.groups.length, 1);
-    assert.equal(board.groups[0].status, 'work'); // tiến trình 100 đang bận
+    assert.equal(board.groups[0].status, 'work'); // process 100 is busy
     assert.equal((await fetch(`${base}/`)).status, 200);
     assert.equal((await fetch(`${base}/app.js`)).status, 200);
     assert.equal((await fetch(`${base}/../package.json`)).status === 200, false);

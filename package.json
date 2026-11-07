@@ -1,7 +1,7 @@
 {
   "name": "thread-board",
   "version": "0.1.0",
-  "description": "Bảng Kanban chỉ đọc cho các thread Claude Code trong Claude desktop",
+  "description": "Read-only Kanban board for Claude Code threads in Claude desktop",
   "type": "module",
   "private": true,
   "license": "MIT",
@@ -11,13 +11,16 @@
   "scripts": {
     "start": "node server.js",
     "test": "node --test test/",
+    "check": "tsc",
     "app": "electron .",
     "icons": "node desktop/make-icons.mjs",
     "build": "node desktop/build-icns.mjs && electron-builder --mac dir"
   },
   "devDependencies": {
+    "@types/node": "^22.20.5",
     "electron": "^45.2.3",
-    "electron-builder": "^26.18.0"
+    "electron-builder": "^26.18.0",
+    "typescript": "^5.9.3"
   },
   "main": "desktop/main.js",
   "build": {

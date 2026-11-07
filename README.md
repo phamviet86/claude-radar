@@ -9,6 +9,7 @@ No dependencies, no plugins or hooks installed into Claude, nothing written to `
 ```bash
 npm start        # http://127.0.0.1:4848  (change the port: PORT=5000 npm start)
 npm test
+npm run check   # type-check lib/ and server.js (JSDoc + checkJs, needs `npm install`; no build step)
 ```
 
 Requires Node 22 or later. The server listens on `127.0.0.1` only and rejects other Host headers, so thread titles and summaries never leave your machine.

@@ -1,7 +1,7 @@
-// Giao diện chỉ đọc: lấy /api/board mỗi 5 giây và cập nhật theo id thread (giữ DOM cũ, không vẽ lại cả danh sách).
-// Một lưới thẻ duy nhất, xếp từ trái sang phải: cần input trước, rồi đang chạy, rồi đã xong. Thẻ mang màu nền của trạng thái.
-// Thẻ đổi trạng thái thì trượt tới vị trí mới (FLIP) và nháy nền nhẹ. Bấm thẻ để xem timeline.
-const ST = {
+// Read-only UI: fetches /api/board every 5 seconds and updates by thread id (keeps the existing DOM, never redraws the whole list).
+// A single grid of cards, left to right: needs input first, then running, then done. Each card is tinted by its status.
+// A card that changes status slides to its new position (FLIP) and flashes briefly. Click a card to see its timeline.
+const STATUS_META = {
   input: { name: 'Needs input', icon: 'circle-alert', c: 'var(--input)' },
   work: { name: 'Running', icon: 'circle-dot', c: 'var(--work)' },
   done: { name: 'Done', icon: 'circle-check', c: 'var(--done)' },
@@ -25,14 +25,14 @@ try {
   state.pinned = saved.pinned === true;
   if (!RANGES.some((r) => r[0] === state.range)) state.range = '3d';
   if (!['all', 'input', 'work', 'done'].includes(state.status)) state.status = 'all';
-} catch { /* không có localStorage: dùng mặc định */ }
+} catch { /* no localStorage: use the defaults */ }
 const save = () => {
   try {
     localStorage.setItem('thread-board', JSON.stringify({ tab: state.tab, folder: state.folder, theme: state.theme, range: state.range, status: state.status, pinned: state.pinned }));
-  } catch { /* bỏ qua */ }
+  } catch { /* ignore */ }
 };
 
-/* ---- thời gian ---- */
+/* ---- time ---- */
 function ago(ts, short = false) {
   const m = Math.max(0, Math.round((Date.now() - ts) / 60000));
   if (short) return m < 2 ? 'now' : m < 60 ? `${m}m` : m < 1440 ? `${Math.round(m / 60)}h` : `${Math.round(m / 1440)}d`;
@@ -53,7 +53,7 @@ function span(ms) {
   return `${(s / 3600).toFixed(1).replace('.0', '')} h`;
 }
 
-/* ---- nhãn dự án: biểu tượng Lucide riêng cho mỗi thư mục, kèm màu; cố định theo tên, không trùng nhau ---- */
+/* ---- project tags: a Lucide icon and color per folder; stable by name, unique across the folders present ---- */
 const ICON_NAMES = Object.keys(LUCIDE);
 const hash = (s) => { let h = 2166136261; for (const ch of s) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0; return h; };
 let tags = new Map();
@@ -77,7 +77,7 @@ const tagEl = (path) => {
   return `<span class="tg" style="--tc:hsl(${t.hue} 62% 46%)" aria-hidden="true"><svg viewBox="0 0 24 24">${LUCIDE[ICON_NAMES[t.icon]]}</svg></span>`;
 };
 
-/* ---- mở thread trong Claude desktop ---- */
+/* ---- open a thread in Claude desktop ---- */
 const openUrl = (id) => `claude://code/continue?session=${encodeURIComponent(id)}`;
 const openLink = (id, label) => `<a class="open" href="${esc(openUrl(id))}" title="Open this thread in Claude desktop">${label}${ui('external-link')}</a>`;
 
@@ -85,7 +85,7 @@ const groups = () => state.data?.groups ?? [];
 const members = (g) => [g, ...g.children.flatMap((c) => [c, ...c.children])];
 const findGroup = (id) => groups().find((g) => members(g).some((m) => m.id === id));
 
-/* ---- thẻ ---- */
+/* ---- cards ---- */
 function lineHtml(g) {
   const l = g.line;
   if (!l) return '<p class="sum nosum">No messages yet</p>';
@@ -96,30 +96,30 @@ function lineHtml(g) {
 function cardHtml(g) {
   const ks = g.children;
   const kids = g.status !== 'done' && ks.length
-    ? `<ul class="kids">${ks.map((c) => `<li><button class="kid-btn" data-id="${esc(c.id)}" style="--c:${ST[c.status].c}">${ui('corner-down-right')}<span class="kt">${esc(c.title)}</span>${c.folder !== g.folder ? `<span class="kf">${esc(c.folder)}</span>` : ''}<span class="ks">${ST[c.status].name}</span></button></li>`).join('')}</ul>`
+    ? `<ul class="kids">${ks.map((c) => `<li><button class="kid-btn" data-id="${esc(c.id)}" style="--c:${STATUS_META[c.status].c}">${ui('corner-down-right')}<span class="kt">${esc(c.title)}</span>${c.folder !== g.folder ? `<span class="kf">${esc(c.folder)}</span>` : ''}<span class="ks">${STATUS_META[c.status].name}</span></button></li>`).join('')}</ul>`
     : '';
-  // số thread con nằm ngay dưới phần tóm tắt (thread chưa xong thì liệt kê từng thread con)
+  // child threads sit right under the summary (listed one by one while the group is not done)
   const count = g.status === 'done' && ks.length ? `<span class="badge kc">+${ks.length} thread</span>` : '';
   const pin = g.status !== 'input' && g.starred ? `<span class="pin">${ui('pin')}PINNED</span>` : '';
-  // cần input: nút đầy đủ "Mở trong Claude" (mở đúng thread đang chờ); còn lại: chỉ một nút biểu tượng. Cả hai nằm bên trái giờ.
+  // needs input: the full "Open in Claude" button (opens the exact thread that is waiting); otherwise just an icon button. Both sit to the left of the time.
   const open = g.status === 'input'
     ? openLink(g.leadId, 'Open in Claude')
     : `<a class="open-sm" href="${esc(openUrl(g.id))}" aria-label="Open &quot;${esc(g.title)}&quot; in Claude" title="Open in Claude">${ui('external-link')}</a>`;
   const run = g.status === 'work' && g.leadRun ? `<span class="runchip"><i class="led"></i>PID ${g.leadRun.pid}</span>` : '';
-  const head = `<div class="chead"><span class="cs">${ui(ST[g.status].icon)}${{ input: 'NEEDS INPUT', work: 'RUNNING', done: 'DONE' }[g.status]}</span><span class="cid proj">${tagEl(g.path)}<span class="pn">${esc(g.folder)}</span></span></div>`;
+  const head = `<div class="chead"><span class="cs">${ui(STATUS_META[g.status].icon)}${{ input: 'NEEDS INPUT', work: 'RUNNING', done: 'DONE' }[g.status]}</span><span class="cid proj">${tagEl(g.path)}<span class="pn">${esc(g.folder)}</span></span></div>`;
   return `${head}<button class="main" data-id="${esc(g.id)}"><span class="title">${esc(g.title)}</span>${lineHtml(g)}</button>${kids}
     <div class="foot"><div class="fr-act">${open}${pin}${count}${run || `<time data-at="${g.activityAt}"></time>`}</div></div>`;
 }
 
 const els = new Map();
 function flash(el) { el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); }
-/** Mốc thời gian (ms) đầu của khoảng đang chọn; thread đã xong cũ hơn mốc này bị ẩn. Cần input và đang chạy luôn hiện. */
+/** Start (ms) of the selected time range; finished threads older than this are hidden. Needs-input and running threads always show. */
 function cutoff() {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
   return { '1d': d.getTime(), '3d': Date.now() - 3 * 86400000, all: 0 }[state.range];
 }
-/** Danh sách thẻ của bảng: lọc theo dự án, trạng thái, khoảng thời gian (chỉ cho thread xong); cần input trước, rồi đang chạy, rồi xong. */
+/** Cards of the board: filtered by project, status and time range (finished threads only); needs input first, then running, then done. */
 function boardList() {
   const from = cutoff();
   return groups()
@@ -134,7 +134,7 @@ function messageEl(text) {
   return el;
 }
 
-/** Cập nhật lưới theo id thread. quiet = không chạy hiệu ứng (lần đầu, đổi bộ lọc). */
+/** Updates the grid by thread id. quiet = no effects (first render, filter change). */
 function sync(quiet) {
   const all = groups();
   const list = boardList();
@@ -143,7 +143,7 @@ function sync(quiet) {
   const first = new Map();
   for (const [id, el] of els) if (el.isConnected) first.set(id, el.getBoundingClientRect());
 
-  // lần vẽ đầu tiên có thẻ: chuỗi "bật nguồn" ngắn
+  // first render that has cards: a short "power-on" sequence
   const booting = !state.booted && list.length > 0;
   if (booting) { state.booted = true; host.classList.add('boot'); setTimeout(() => host.classList.remove('boot'), 1400); }
   const seen = new Set();
@@ -225,21 +225,21 @@ function chips() {
   host.innerHTML = chipHtml.slice(0, cut) + pinChip + chipHtml.slice(cut);
 }
 
-/* ---- tab Dự án: thread của dự án ở trên, ô chọn để chỉ xem việc của vài thread, rồi "đang làm gì" / "đã làm được" ---- */
-/** Mọi thread của một nhóm (gốc, con, cháu) với trạng thái riêng của từng thread. */
+/* ---- Projects tab: the project's threads on top, checkboxes to show only some threads' work, then "In progress" / "Finished" ---- */
+/** Every thread of a group (root, children, grandchildren) with each thread's own status. */
 function flat(g) {
   const out = [{ id: g.id, title: g.title, depth: 0, ...g.own }];
   const walk = (c, depth) => { out.push({ id: c.id, title: c.title, depth, status: c.status, detail: c.detail, stale: c.stale, latest: c.latest, activityAt: c.activityAt }); c.children.forEach((k) => walk(k, depth + 1)); };
   g.children.forEach((c) => walk(c, 1));
   return out;
 }
-/** Dòng mô tả việc của một thread: đang chạy thì tin mới nhất, còn lại thì tóm tắt của Claude (nếu có). */
+/** Description line of a thread: the latest message while running, otherwise Claude's summary (if any). */
 const workText = (m) => (m.status === 'work' ? (m.latest?.text ?? m.detail) : (m.detail ?? m.latest?.text)) ?? '';
 const RANK = { input: 0, work: 1, done: 2 };
 
 function workItem(m) {
   const text = workText(m);
-  return `<li class="witem" style="--c:${ST[m.status].c}"><span class="wic">${ui(ST[m.status].icon)}</span><div class="wbody"><button class="wt" data-id="${esc(m.id)}">${esc(m.title)}</button><p class="${text ? '' : 'nosum'}">${text ? esc(text) : 'No summary yet'}</p></div><time>${ago(m.activityAt, true)}</time></li>`;
+  return `<li class="witem" style="--c:${STATUS_META[m.status].c}"><span class="wic">${ui(STATUS_META[m.status].icon)}</span><div class="wbody"><button class="wt" data-id="${esc(m.id)}">${esc(m.title)}</button><p class="${text ? '' : 'nosum'}">${text ? esc(text) : 'No summary yet'}</p></div><time>${ago(m.activityAt, true)}</time></li>`;
 }
 
 function projectsHtml() {
@@ -252,10 +252,10 @@ function projectsHtml() {
     const doing = shown.filter((m) => m.status !== 'done').sort((a, b) => RANK[a.status] - RANK[b.status] || b.activityAt - a.activityAt);
     const doneAll = shown.filter((m) => m.status === 'done').sort((a, b) => b.activityAt - a.activityAt);
     const done = doneAll.slice(0, picked.length ? 20 : 6);
-    const stat = (k, label) => (f.count[k] ? `<span class="stat" style="--c:${ST[k].c}">${ui(ST[k].icon)}${f.count[k]} ${label}</span>` : '');
-    const rows = all.map((m) => `<div class="trow ${m.depth ? 'c' : ''}" style="--c:${ST[m.status].c}" ${m.depth > 1 ? `data-d="${m.depth}"` : ''}>
+    const stat = (k, label) => (f.count[k] ? `<span class="stat" style="--c:${STATUS_META[k].c}">${ui(STATUS_META[k].icon)}${f.count[k]} ${label}</span>` : '');
+    const rows = all.map((m) => `<div class="trow ${m.depth ? 'c' : ''}" style="--c:${STATUS_META[m.status].c}" ${m.depth > 1 ? `data-d="${m.depth}"` : ''}>
         <input type="checkbox" data-pick="${esc(m.id)}" ${state.pick.has(m.id) ? 'checked' : ''} aria-label="Show only the work of thread ${esc(m.title)}">
-        <span class="tic" title="${ST[m.status].name}">${ui(ST[m.status].icon)}</span>
+        <span class="tic" title="${STATUS_META[m.status].name}">${ui(STATUS_META[m.status].icon)}</span>
         <button class="tn" data-id="${esc(m.id)}">${esc(m.title)}</button>
         <time>${ago(m.activityAt, true)}</time>
         <a class="open-sm row" href="${esc(openUrl(m.id))}" aria-label="Open &quot;${esc(m.title)}&quot; in Claude" title="Open in Claude">${ui('external-link')}</a>
@@ -271,7 +271,7 @@ function projectsHtml() {
   }).join('');
 }
 
-/* ---- markdown rút gọn cho timeline: đoạn, danh sách, in đậm/nghiêng, mã, trích dẫn, liên kết http(s). Luôn thoát HTML trước. ---- */
+/* ---- small markdown for the timeline: paragraphs, lists, bold/italic, code, quotes, http(s) links. HTML is always escaped first. ---- */
 function mdInline(s) {
   const codes = [];
   s = s.replace(/`([^`\n]+)`/g, (_, c) => { codes.push(c); return `\u0000${codes.length - 1}\u0000`; });
@@ -311,7 +311,7 @@ function md(text) {
   return out.join('');
 }
 
-/* ---- ngăn chi tiết + timeline ---- */
+/* ---- detail drawer + timeline ---- */
 let lastFocus = null;
 function timelineHtml(g, m) {
   const tl = state.timeline && state.timeline.id === m.id ? state.timeline : null;
@@ -336,12 +336,12 @@ function drawerHtml(g, m) {
   const all = [g, ...g.children];
   const asking = g.status === 'input' ? members(g).find((x) => x.id === g.leadId) ?? g : null;
   const summary = m.detail ? `<div><p class="lbl">${m.status === 'work' ? 'Summary of the previous turn' : 'Claude\'s summary'}</p><p class="d">${esc(m.detail)}</p></div>` : '';
-  return `<div class="d-top"><span class="pillst" style="--c:${ST[g.status].c}">${ui(ST[g.status].icon)}${ST[g.status].name}</span><button class="btn" id="dclose" aria-label="Close">${ui('x')}Close</button></div>
+  return `<div class="d-top"><span class="pillst" style="--c:${STATUS_META[g.status].c}">${ui(STATUS_META[g.status].icon)}${STATUS_META[g.status].name}</span><button class="btn" id="dclose" aria-label="Close">${ui('x')}Close</button></div>
     <div><h2>${esc(g.title)}</h2><div class="path">${tagEl(g.path)}${esc(g.path)}</div></div>
     <div class="idline"><span>ID <b>${esc(m.id)}</b></span>${(m.run ?? (m.id === g.id ? g.own?.run : null)) ? `<span>PID <b>${(m.run ?? g.own.run).pid}</b> · ${esc((m.run ?? g.own.run).status ?? '')}</span>` : ''}</div>
     ${asking?.detail ? `<div><p class="lbl">Waiting for you</p><div class="ask">${esc(asking.detail)}</div></div>` : ''}
     <div>${openLink(m.id, m.status === 'input' ? 'Open in Claude to reply' : 'Open this thread in Claude')}</div>
-    ${all.length > 1 ? `<div><p class="lbl">Threads in this group</p><div class="members" role="tablist">${all.map((x) => `<button class="mem" role="tab" data-member="${esc(x.id)}" aria-selected="${x.id === m.id}" style="--c:${ST[x.status].c}"><span class="mst"></span>${esc(x.title)}<span class="ms">${ST[x.status].name}</span></button>`).join('')}</div></div>` : ''}
+    ${all.length > 1 ? `<div><p class="lbl">Threads in this group</p><div class="members" role="tablist">${all.map((x) => `<button class="mem" role="tab" data-member="${esc(x.id)}" aria-selected="${x.id === m.id}" style="--c:${STATUS_META[x.status].c}"><span class="mst"></span>${esc(x.title)}<span class="ms">${STATUS_META[x.status].name}</span></button>`).join('')}</div></div>` : ''}
     ${summary}
     <div><p class="lbl">Timeline${all.length > 1 ? `: ${esc(m.title)}` : ''}</p>${timelineHtml(g, m)}</div>
     <div class="hint">This page only shows status. The "Open in Claude" button uses the claude:// link of Claude desktop; if nothing happens, open the thread from Claude desktop's own list. Status is derived from Claude's automatic summaries, so it may not always be accurate.</div>`;
@@ -392,7 +392,7 @@ async function loadTimeline(id) {
   drawer();
 }
 
-/* ---- giao diện sáng/tối ---- */
+/* ---- light/dark theme ---- */
 function applyTheme() {
   if (state.theme === 'auto') document.documentElement.removeAttribute('data-theme');
   else document.documentElement.setAttribute('data-theme', state.theme);
@@ -401,12 +401,12 @@ function applyTheme() {
   $('#themeIc').innerHTML = LUCIDE_UI[ic];
 }
 
-/* ---- vẽ lại ---- */
+/* ---- redraw ---- */
 function render(quiet) {
   assignTags((state.data?.folders ?? []).map((f) => f.path));
   chips();
   rangeBar();
-  $('#range').style.display = state.tab === 'board' ? '' : 'none'; // khoảng thời gian chỉ áp cho bảng, trang Dự án không dùng
+  $('#range').style.display = state.tab === 'board' ? '' : 'none'; // the time range only applies to the board; the Projects tab does not use it
   $('#tab-board').setAttribute('aria-selected', String(state.tab === 'board'));
   $('#tab-proj').setAttribute('aria-selected', String(state.tab === 'proj'));
   $('#board').hidden = state.tab !== 'board';
@@ -420,19 +420,19 @@ function setBanner(text) {
   b.hidden = !text;
   b.textContent = text || '';
 }
-/** Số thread theo trạng thái ở thanh đáy; bấm một số để chỉ xem trạng thái đó, bấm lần nữa để bỏ lọc. */
+/** Thread counts per status in the top bar; click one to see only that status, click again to clear. */
 function counts() {
   const gs = groups();
   const n = (k) => gs.filter((g) => g.status === k).length;
   const ni = n('input'), nw = n('work'), nd = n('done');
-  // đèn sáng theo mức cần chú ý: có input và/hoặc đang chạy thì sáng các đèn đó, đèn done tắt; chỉ còn done thì sáng đèn done
+  // lights follow how much attention is needed: input and/or running light up their lamps and the done lamp stays off; when only done is left, the done lamp lights up
   const lit = { input: ni > 0, work: nw > 0, done: nd > 0 && ni === 0 && nw === 0 };
   const num = { input: ni, work: nw, done: nd };
-  const html = ['input', 'work', 'done'].map((k) => `<button data-status="${k}" data-lit="${lit[k]}" aria-pressed="${state.status === k}" title="${ST[k].name}: click to filter" style="--c:${ST[k].c}"><i class="led"></i>${{ input: 'INPUT', work: 'RUN', done: 'DONE' }[k]} <b>${String(num[k]).padStart(2, '0')}</b></button>`).join('');
+  const html = ['input', 'work', 'done'].map((k) => `<button data-status="${k}" data-lit="${lit[k]}" aria-pressed="${state.status === k}" title="${STATUS_META[k].name}: click to filter" style="--c:${STATUS_META[k].c}"><i class="led"></i>${{ input: 'INPUT', work: 'RUN', done: 'DONE' }[k]} <b>${String(num[k]).padStart(2, '0')}</b></button>`).join('');
   const host = $('#sb-counts');
   if (host.dataset.sig !== html) { host.dataset.sig = html; host.innerHTML = html; }
 }
-/** Tình trạng kết nối (đèn LIVE) ở góc phải thanh trên. */
+/** Connection state (the LIVE light) in the top-right corner. */
 function statusBar(ok) {
   $('#sb-led').className = `led ${ok ? 'live' : 'off'}`;
   $('#sb-state').textContent = ok ? 'LIVE' : 'DISCONNECTED';
@@ -449,14 +449,14 @@ async function poll() {
       state.raw = raw;
       state.data = data;
       render(firstLoad);
-      if (state.member) loadTimeline(state.member); // thread đang mở có thể vừa có thêm lượt mới
+      if (state.member) loadTimeline(state.member); // the open thread may have just got a new turn
       if (firstLoad) {
         const m = /^#thread=(.+)$/.exec(location.hash);
         if (m) openDrawer(decodeURIComponent(m[1]));
       }
       firstLoad = false;
     } else {
-      sync(true); // dữ liệu không đổi: chỉ làm mới nhãn thời gian
+      sync(true); // data unchanged: only refresh the time labels
     }
     $('#stamp').textContent = new Date().toLocaleTimeString('en-GB');
     statusBar(true);
@@ -488,7 +488,7 @@ document.addEventListener('click', (e) => {
   else if (b.dataset.member) { state.member = b.dataset.member; state.timeline = null; drawer(); loadTimeline(state.member); }
   else if (b.dataset.id) openDrawer(b.dataset.id);
   else if (b.dataset.status) {
-    // bấm số ở thanh đáy: chỉ xem trạng thái đó; bấm lần nữa để bỏ lọc
+    // click a count in the top bar: show only that status; click again to clear
     state.status = state.status === b.dataset.status ? 'all' : b.dataset.status;
     state.more = false;
     if (state.tab !== 'board') state.tab = 'board';

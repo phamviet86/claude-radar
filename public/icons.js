@@ -1,7 +1,8 @@
-/* Biểu tượng từ Lucide (https://lucide.dev), giấy phép ISC.
- * Copyright (c) 2026 Lucide Icons and Contributors. Được phép sao chép, sửa và phân phối với hoặc không có phí,
- * miễn là giữ nguyên dòng bản quyền này và thông báo cấp phép (nội dung đầy đủ trong LICENSE-lucide).
- * Mỗi mục là phần bên trong của một SVG 24x24 vẽ bằng nét (stroke-width 2, bo tròn). */
+/* Icons from Lucide (https://lucide.dev), ISC license.
+ * Copyright (c) 2026 Lucide Icons and Contributors. Permission to use, copy, modify, and/or distribute this software
+ * for any purpose with or without fee is granted, provided that this copyright notice and the permission notice are kept
+ * (full text in LICENSE-lucide).
+ * Each entry is the inside of a 24x24 stroked SVG (stroke-width 2, round caps). */
 const LUCIDE = {
  "rocket": "<path d=\"M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5\" /> <path d=\"M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09\" /> <path d=\"M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z\" /> <path d=\"M9 12H4s.55-3.03 2-4c1.62-1.08 5 .05 5 .05\" />",
  "flask-conical": "<path d=\"M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2\" /> <path d=\"M6.453 15h11.094\" /> <path d=\"M8.5 2h7\" />",
@@ -58,7 +59,7 @@ const LUCIDE = {
  "telescope": "<path d=\"m10.065 12.493-6.18 1.318a.934.934 0 0 1-1.108-.702l-.537-2.15a1.07 1.07 0 0 1 .691-1.265l13.504-4.44\" /> <path d=\"m13.56 11.747 4.332-.924\" /> <path d=\"m16 21-3.105-6.21\" /> <path d=\"M16.485 5.94a2 2 0 0 1 1.455-2.425l1.09-.272a1 1 0 0 1 1.212.727l1.515 6.06a1 1 0 0 1-.727 1.213l-1.09.272a2 2 0 0 1-2.425-1.455z\" /> <path d=\"m6.158 8.633 1.114 4.456\" /> <path d=\"m8 21 3.105-6.21\" /> <circle cx=\"12\" cy=\"13\" r=\"2\" />"
 };
 
-/* Biểu tượng giao diện (cũng của Lucide, cùng giấy phép). Không dùng làm nhãn dự án. */
+/* Interface icons (also from Lucide, same license). Not used as project tags. */
 const LUCIDE_UI = {
  "radar": "<path d=\"M19.07 4.93A10 10 0 0 0 6.99 3.34\" /> <path d=\"M4 6h.01\" /> <path d=\"M2.29 9.62A10 10 0 1 0 21.31 8.35\" /> <path d=\"M16.24 7.76A6 6 0 1 0 8.23 16.67\" /> <path d=\"M12 18h.01\" /> <path d=\"M17.99 11.66A6 6 0 0 1 15.77 16.67\" /> <circle cx=\"12\" cy=\"12\" r=\"2\" /> <path d=\"m13.41 10.59 5.66-5.66\" />",
  "pin": "<path d=\"M12 17v5\" /> <path d=\"M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z\" />",

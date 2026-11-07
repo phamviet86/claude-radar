@@ -1,5 +1,5 @@
-// Vẽ biểu tượng bằng mã (không cần công cụ ngoài): app icon 1024px (nền xanh đen, radar cyan) và biểu tượng thanh menu (template, đen trong suốt).
-// Chạy: node desktop/make-icons.mjs  ->  desktop/icon.png, desktop/iconTemplate.png, desktop/iconTemplate@2x.png
+// Draws the icons in code (no external tools): the 1024px app icon (deep navy background, cyan radar) and the menu-bar icon (template, transparent black).
+// Run: node desktop/make-icons.mjs  ->  desktop/icon.png, desktop/iconTemplate.png, desktop/iconTemplate@2x.png
 import { deflateSync } from 'node:zlib';
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -19,7 +19,7 @@ function png(w, h, rgba) {
   const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4); ihdr[8] = 8; ihdr[9] = 6;
   return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
 }
-/** Dựng ảnh bằng hàm màu f(x, y) trong [0,1]²; lấy mẫu con 4x4 cho mép mịn. */
+/** Builds an image from a color function f(x, y) over [0,1]²; 4x4 supersampling for smooth edges. */
 function render(size, f) {
   const out = Buffer.alloc(size * size * 4); const S = 4;
   for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
@@ -35,7 +35,7 @@ function render(size, f) {
   return out;
 }
 const ring = (d, r, w) => Math.abs(d - r) < w / 2;
-/** Radar: hai vòng, cánh quét và chấm. */
+/** Radar: two rings, a sweep arm and a dot. */
 function radar(x, y, color, ringW) {
   const dx = x - .5, dy = y - .5, d = Math.hypot(dx, dy);
   if (ring(d, .30, ringW) || ring(d, .17, ringW)) return color;
@@ -44,7 +44,7 @@ function radar(x, y, color, ringW) {
   if (along > 0 && along < .30 && perp < ringW * .45) return color;
   return null;
 }
-// app icon: ô vuông bo góc (kiểu macOS), nền gradient xanh đen, radar cyan
+// app icon: rounded square (macOS style), navy gradient background, cyan radar
 const app = render(1024, (x, y) => {
   const dx = Math.abs(x - .5) - .27, dy = Math.abs(y - .5) - .27, rr = .13;
   const inside = Math.hypot(Math.max(dx, 0), Math.max(dy, 0)) + Math.min(Math.max(dx, dy), 0) < rr;
@@ -54,7 +54,7 @@ const app = render(1024, (x, y) => {
   return radar(x, y, [63, 224, 255, 1], .035) ?? bg;
 });
 writeFileSync(join(dir, 'icon.png'), png(1024, 1024, app));
-// thanh menu: template (chỉ cần kênh alpha; macOS tự đổi màu theo giao diện sáng/tối)
+// menu bar: template image (only the alpha channel matters; macOS recolors it for light/dark)
 for (const [name, s] of [['iconTemplate.png', 18], ['iconTemplate@2x.png', 36]]) {
   writeFileSync(join(dir, name), png(s, s, render(s, (x, y) => radar(x, y, [0, 0, 0, 1], s === 18 ? .11 : .09))));
 }
