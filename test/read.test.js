@@ -39,7 +39,7 @@ test('SessionReader: thiếu thư mục chỉ cảnh báo, không lỗi', () => 
   const out = r.read();
   assert.deepEqual(out.desktop, []);
   assert.equal(out.warnings.length, 2);
-  assert.equal(new SessionReader({ desktopDir: null, registryDir: '/x' }).read().warnings[0].includes('Đã tắt'), true);
+  assert.equal(new SessionReader({ desktopDir: null, registryDir: '/x' }).read().warnings[0].includes('turned off'), true);
 });
 
 test('đường dẫn mặc định theo hệ điều hành và biến môi trường', () => {

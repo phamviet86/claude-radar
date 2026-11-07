@@ -43,7 +43,7 @@ test('timeline: bỏ thread phụ, thông báo hệ thống, dòng hỏng; lện
     user(4, '<command-name>/compact</command-name><command-args></command-args>'),
   ].join('\n');
   const { turns } = parseTranscript(text);
-  assert.deepEqual(turns.map((t) => t.prompt), ['Lệnh /compact', 'nhắn thật']);
+  assert.deepEqual(turns.map((t) => t.prompt), ['Command /compact', 'nhắn thật']);
   assert.equal(turns[1].reply, '');
 });
 
@@ -53,6 +53,49 @@ test('timeline: cắt ngắn văn bản dài và giới hạn số lượt', () 
   const { turns, omitted } = parseTranscript(many, 3);
   assert.equal(turns.length, 3);
   assert.equal(omitted, 2);
-  assert.ok(turns[0].reply.length <= 520);
+  assert.ok(turns[0].reply.length <= 1600);
   assert.equal(turns[0].prompt, 'lượt 4');
+});
+
+import { latestMessage } from '../lib/timeline.js';
+
+test('latestMessage: lấy tin mới nhất, bỏ markdown, bỏ thread phụ và suy nghĩ', () => {
+  const text = [
+    user(0, 'làm giúp tôi'),
+    asst(2, [{ type: 'text', text: '## Kết quả\n- **Đã sửa** `lib/a.js`\n```js\ncode\n```' }]),
+    asst(5, [{ type: 'thinking', thinking: 'MẬT' }, { type: 'tool_use', name: 'Bash', input: {} }]),
+    asst(6, [{ type: 'text', text: 'ẩn' }], { isSidechain: true }),
+  ].join('\n');
+  const m = latestMessage(text);
+  assert.equal(m.role, 'assistant');
+  assert.equal(m.text, 'Kết quả Đã sửa lib/a.js');
+  assert.ok(!JSON.stringify(m).includes('MẬT'));
+});
+
+test('latestMessage: tin của bạn mới hơn thì hiện tin của bạn; rỗng thì null', () => {
+  const text = [asst(1, [{ type: 'text', text: 'trả lời cũ' }]), user(9, 'câu hỏi mới')].join('\n');
+  assert.deepEqual(latestMessage(text), { role: 'user', at: Date.parse(T(9)), text: 'câu hỏi mới' });
+  assert.equal(latestMessage(''), null);
+  assert.equal(latestMessage('{hỏng\n'), null);
+});
+
+test('latestMessage: cắt ngắn tin dài', () => {
+  const m = latestMessage(asst(1, [{ type: 'text', text: 'a '.repeat(500) }]));
+  assert.ok(m.text.length <= 240);
+});
+
+test('timeline: giữ xuống dòng và danh sách markdown, cắt ở ranh giới dòng', () => {
+  const reply = '**Thay đổi:**\n- Một\n- Hai\n\n\n\nCuối';
+  const { turns } = parseTranscript([user(0, 'dòng 1\r\ndòng 2'), asst(1, [{ type: 'text', text: reply }])].join('\n'));
+  assert.equal(turns[0].prompt, 'dòng 1\ndòng 2');
+  assert.equal(turns[0].reply, '**Thay đổi:**\n- Một\n- Hai\n\nCuối');
+  const long = Array.from({ length: 400 }, (_, i) => `- mục số ${i}`).join('\n');
+  const cut = parseTranscript([user(0, 'x'), asst(1, [{ type: 'text', text: long }])].join('\n')).turns[0].reply;
+  assert.ok(cut.length <= 1600 && cut.endsWith('…'));
+  assert.ok(/mục số \d+…$/.test(cut)); // cắt ở cuối một dòng, không giữa chừng
+});
+
+test('latestMessage: tin của bạn cũng bỏ ký hiệu danh sách markdown', () => {
+  const m = latestMessage(user(0, 'ý chính:\n* cho to ra\n* hiển thị markdown'));
+  assert.equal(m.text, 'ý chính: cho to ra hiển thị markdown');
 });

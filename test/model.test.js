@@ -108,11 +108,12 @@ test('buildBoard: mẹ thiếu hoặc đã lưu trữ -> con đứng riêng; vò
   assert.ok(b.groups.length >= 1);
 });
 
-test('buildBoard: ghim lên đầu, nhóm ngày chỉ cho thread xong', () => {
+test('buildBoard: xếp theo thời gian (ghim không lên đầu), nhóm ngày chỉ cho thread xong', () => {
   const desktop = [t('x', { lastActivityAt: NOW - 20 * D }), t('y', { lastActivityAt: NOW - H }), t('z', { starred: true, lastActivityAt: NOW - 5 * D })];
   const b = buildBoard({ desktop, registry: [], now: NOW });
-  assert.deepEqual(b.groups.map((g) => g.id), ['z', 'y', 'x']);
-  assert.deepEqual(b.groups.map((g) => g.bucket), ['week', 'today', 'older']);
+  assert.deepEqual(b.groups.map((g) => g.id), ['y', 'z', 'x']);
+  assert.deepEqual(b.groups.map((g) => g.bucket), ['today', 'week', 'older']);
+  assert.equal(b.groups.find((g) => g.id === 'z').starred, true); // vẫn đánh dấu là thread ghim
   const busy = buildBoard({ desktop: [t('w')], registry: [{ pid: 1, hostId: 'w', status: 'busy' }], now: NOW });
   assert.equal(busy.groups[0].bucket, null);
 });
@@ -134,4 +135,54 @@ test('buildBoard: tóm tắt theo thư mục', () => {
 test('projectPath', () => {
   assert.equal(projectPath('/a/b', '/a/b/c'), '/a/b');
   assert.equal(projectPath(undefined, '/a/b'), '/a/b');
+});
+
+test('buildBoard: tin nhắn mới nhất lấy từ thread quyết định trạng thái của nhóm', () => {
+  const desktop = [t('m'), t('c', { parentId: 'm' })];
+  const latest = new Map([['m', { role: 'assistant', at: 1, text: 'tin của mẹ' }], ['c', { role: 'assistant', at: 2, text: 'tin của con' }]]);
+  let b = buildBoard({ desktop, registry: [], now: NOW, latest });
+  assert.equal(b.groups[0].latest.text, 'tin của mẹ'); // cả hai xong: lấy thread mới nhất theo hoạt động
+  b = buildBoard({ desktop, registry: [{ pid: 1, hostId: 'c', status: 'busy' }], now: NOW, latest });
+  assert.equal(b.groups[0].latest.text, 'tin của con');
+  assert.equal(b.groups[0].latestFrom, 'c');
+  assert.equal(buildBoard({ desktop: [t('x')], registry: [], now: NOW }).groups[0].latest, null);
+});
+
+import { cardLine } from '../lib/model.js';
+
+test('cardLine: dừng thì tóm tắt, đang chạy hoặc chưa có tóm tắt thì tin nhắn mới nhất', () => {
+  const msg = { role: 'assistant', at: 1, text: 'tin cuối' };
+  assert.deepEqual(cardLine({ status: 'done', detail: 'tóm tắt', latest: msg }), { kind: 'summary', text: 'tóm tắt' });
+  assert.deepEqual(cardLine({ status: 'input', detail: 'Hỏi?', latest: msg }), { kind: 'summary', text: 'Hỏi?' });
+  assert.deepEqual(cardLine({ status: 'work', detail: 'cũ', latest: msg }), { kind: 'message', role: 'assistant', text: 'tin cuối' });
+  assert.deepEqual(cardLine({ status: 'done', detail: undefined, latest: msg }), { kind: 'message', role: 'assistant', text: 'tin cuối' });
+  assert.deepEqual(cardLine({ status: 'work', detail: 'cũ', latest: null }), { kind: 'summary', text: 'cũ', stale: true });
+  assert.equal(cardLine({ status: 'done', detail: undefined, latest: null }), null);
+  assert.ok(cardLine({ status: 'done', detail: 'x'.repeat(500) }).text.length <= 240);
+});
+
+test('buildBoard: line của nhóm theo thread quyết định trạng thái', () => {
+  const desktop = [t('m'), t('c', { parentId: 'm' })];
+  const latest = new Map([['c', { role: 'assistant', at: 2, text: 'con đang làm' }]]);
+  let b = buildBoard({ desktop, registry: [], now: NOW, latest });
+  assert.equal(b.groups[0].line.kind, 'summary');
+  b = buildBoard({ desktop, registry: [{ pid: 1, hostId: 'c', status: 'busy' }], now: NOW, latest });
+  assert.deepEqual(b.groups[0].line, { kind: 'message', role: 'assistant', text: 'con đang làm' });
+});
+
+test('buildBoard: own giữ trạng thái riêng của thread gốc dù nhóm đang làm vì thread con', () => {
+  const desktop = [t('m'), t('c', { parentId: 'm' })];
+  const b = buildBoard({ desktop, registry: [{ pid: 1, hostId: 'c', status: 'busy' }], now: NOW });
+  assert.equal(b.groups[0].status, 'work');
+  assert.equal(b.groups[0].own.status, 'done');
+  assert.equal(b.groups[0].own.detail, 'kq m');
+});
+
+test('buildBoard: thông tin tiến trình (pid, trạng thái) đi kèm thread đang chạy', () => {
+  const desktop = [t('m'), t('c', { parentId: 'm' })];
+  const b = buildBoard({ desktop, registry: [{ pid: 4242, hostId: 'c', status: 'busy' }], now: NOW });
+  assert.deepEqual(b.groups[0].leadRun, { pid: 4242, status: 'busy' });
+  assert.deepEqual(b.groups[0].children[0].run, { pid: 4242, status: 'busy' });
+  assert.equal(b.groups[0].own.status, 'done');
+  assert.equal(buildBoard({ desktop: [t('x')], registry: [], now: NOW }).groups[0].leadRun, null);
 });

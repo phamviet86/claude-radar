@@ -1,276 +1,508 @@
-// Giao diện chỉ đọc: lấy /api/board mỗi 5 giây rồi vẽ lại khi dữ liệu đổi. Bấm một thread để xem timeline của nó.
-const COLS = [
-  { k: 'input', name: 'Cần input', c: 'var(--input)' },
-  { k: 'work', name: 'Đang thực hiện', c: 'var(--work)' },
-  { k: 'done', name: 'Hoàn thành', c: 'var(--done)' },
-];
-const LABEL = { input: 'Cần input', work: 'Đang thực hiện', done: 'Hoàn thành' };
-const SC = { input: 'var(--input)', work: 'var(--work)', done: 'var(--done)' };
-const BUCKETS = [['today', 'Hôm nay'], ['yesterday', 'Hôm qua'], ['week', 'Tuần này'], ['older', 'Cũ hơn']];
+// Giao diện chỉ đọc: lấy /api/board mỗi 5 giây và cập nhật theo id thread (giữ DOM cũ, không vẽ lại cả danh sách).
+// Một lưới thẻ duy nhất, xếp từ trái sang phải: cần input trước, rồi đang chạy, rồi đã xong. Thẻ mang màu nền của trạng thái.
+// Thẻ đổi trạng thái thì trượt tới vị trí mới (FLIP) và nháy nền nhẹ. Bấm thẻ để xem timeline.
+const ST = {
+  input: { name: 'Needs input', icon: 'circle-alert', c: 'var(--input)' },
+  work: { name: 'Running', icon: 'circle-dot', c: 'var(--work)' },
+  done: { name: 'Done', icon: 'circle-check', c: 'var(--done)' },
+};
+const RANGES = [['1d', 'Today'], ['3d', '3 days'], ['all', 'All']];
+const ORDER = { input: 0, work: 1, done: 2 };
+const DONE_CAP = 24;
+const THEMES = [['auto', 'Auto', 'monitor'], ['light', 'Light', 'sun'], ['dark', 'Dark', 'moon']];
 const POLL_MS = 5000;
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-/** Bỏ dấu để "tim" khớp "Tìm". */
-const fold = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
+const ui = (name) => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${LUCIDE_UI[name] ?? ''}</svg>`;
+document.querySelectorAll('svg[data-ic]').forEach((s) => { s.innerHTML = LUCIDE_UI[s.dataset.ic] ?? ''; });
+const prefersReduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-const state = { tab: 'board', group: false, folder: 'all', q: '', sel: null, member: null, timeline: null, open: { today: true, yesterday: true, week: true, older: false }, data: null, raw: '' };
+const state = { booted: false, tab: 'board', folder: 'all', theme: 'auto', range: '3d', status: 'all', pinned: false, more: false, sel: null, member: null, timeline: null, data: null, raw: '', pick: new Set() };
 try {
-  Object.assign(state, JSON.parse(localStorage.getItem('thread-board') || '{}'));
+  const saved = JSON.parse(localStorage.getItem('thread-board') || '{}');
+  for (const k of ['tab', 'folder', 'theme', 'range', 'status']) if (typeof saved[k] === 'string') state[k] = saved[k];
+  state.pinned = saved.pinned === true;
+  if (!RANGES.some((r) => r[0] === state.range)) state.range = '3d';
+  if (!['all', 'input', 'work', 'done'].includes(state.status)) state.status = 'all';
 } catch { /* không có localStorage: dùng mặc định */ }
-state.sel = null; state.member = null; state.timeline = null;
 const save = () => {
   try {
-    localStorage.setItem('thread-board', JSON.stringify({ tab: state.tab, group: state.group, folder: state.folder, open: state.open }));
+    localStorage.setItem('thread-board', JSON.stringify({ tab: state.tab, folder: state.folder, theme: state.theme, range: state.range, status: state.status, pinned: state.pinned }));
   } catch { /* bỏ qua */ }
 };
 
-function ago(ts) {
+/* ---- thời gian ---- */
+function ago(ts, short = false) {
   const m = Math.max(0, Math.round((Date.now() - ts) / 60000));
-  if (m < 2) return 'vừa xong';
-  if (m < 60) return `${m} phút trước`;
-  if (m < 1440) return `${Math.round(m / 60)} giờ trước`;
-  return `${Math.round(m / 1440)} ngày trước`;
+  if (short) return m < 2 ? 'now' : m < 60 ? `${m}m` : m < 1440 ? `${Math.round(m / 60)}h` : `${Math.round(m / 1440)}d`;
+  if (m < 2) return 'just now';
+  if (m < 60) return `${m}m ago`;
+  if (m < 1440) return `${Math.round(m / 60)}h ago`;
+  return `${Math.round(m / 1440)}d ago`;
 }
 function clock(ts) {
   const d = new Date(ts), t = new Date();
-  const hm = d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-  return d.toDateString() === t.toDateString() ? hm : `${d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })} ${hm}`;
+  const hm = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  return d.toDateString() === t.toDateString() ? hm : `${d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' })} ${hm}`;
 }
 function span(ms) {
   const s = Math.round(ms / 1000);
-  if (s < 60) return `${s} giây`;
-  if (s < 3600) return `${Math.round(s / 60)} phút`;
-  return `${(s / 3600).toFixed(1).replace('.0', '')} giờ`;
+  if (s < 60) return `${s}s`;
+  if (s < 3600) return `${Math.round(s / 60)} min`;
+  return `${(s / 3600).toFixed(1).replace('.0', '')} h`;
 }
 
-/* ---- thẻ dự án: biểu tượng riêng cho mỗi thư mục, kèm màu. Cố định theo tên, không trùng giữa các thư mục đang có. ---- */
-const ICONS = [
-  '<circle cx="8" cy="8" r="5.5"/>', '<rect x="2.5" y="2.5" width="11" height="11" rx="2"/>', '<path d="M8 2l6.5 11.5h-13z"/>', '<path d="M8 1.5l6.5 6.5L8 14.5 1.5 8z"/>',
-  '<path d="M8 1.5l1.9 4.2 4.6.5-3.4 3.1 1 4.5L8 11.5l-4.1 2.3 1-4.5L1.5 6.2l4.6-.5z"/>', '<path d="M8 1.5l5.6 3.25v6.5L8 14.5l-5.6-3.25v-6.5z"/>',
-  '<path d="M6 2h4v4h4v4h-4v4H6v-4H2V6h4z"/>', '<path d="M8 14S2 10 2 6a3.2 3.2 0 0 1 6-1.6A3.2 3.2 0 0 1 14 6c0 4-6 8-6 8z"/>',
-  '<path d="M9 1.5L3 9h4l-1 5.5L13 7H9z"/>', '<path d="M12.5 10.5A6 6 0 0 1 5.5 3.5a6 6 0 1 0 7 7z"/>', '<path d="M13.5 2.5C6 2.5 2.5 6 2.5 10.5a3 3 0 0 0 3 3C10 13.5 13.5 10 13.5 2.5z"/>',
-  '<path d="M8 1.5S3 7 3 10a5 5 0 0 0 10 0C13 7 8 1.5 8 1.5z"/>', '<path d="M3 1.5h1.5v13H3zM5.5 2.5h8l-2 3 2 3h-8z"/>', '<path d="M5 1.5h6l3.5 3.5v6L11 14.5H5L1.5 11V5z"/>',
-  '<path fill-rule="evenodd" d="M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zm0 3.5a3 3 0 1 1 0 6 3 3 0 0 1 0-6z"/>',
-];
+/* ---- nhãn dự án: biểu tượng Lucide riêng cho mỗi thư mục, kèm màu; cố định theo tên, không trùng nhau ---- */
+const ICON_NAMES = Object.keys(LUCIDE);
 const hash = (s) => { let h = 2166136261; for (const ch of s) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0; return h; };
 let tags = new Map();
 function assignTags(paths) {
   const key = paths.join('|');
   if (tags.key === key) return;
   const next = new Map(), used = new Set();
-  // màu: chia đều vòng màu cho các thư mục đang có (xếp theo hash của tên) nên luôn tách biệt nhau
   const byHash = [...paths].sort((a, b) => hash(a) - hash(b));
   byHash.forEach((p, n) => next.set(p, { icon: -1, hue: Math.round((n * 360) / byHash.length + 24) % 360 }));
-  // biểu tượng: từ tên thư mục, không trùng nhau
   for (const p of [...paths].sort()) {
-    let i = hash(p) % ICONS.length;
-    while (used.has(i) && used.size < ICONS.length) i = (i + 1) % ICONS.length;
+    let i = hash(p) % ICON_NAMES.length;
+    while (used.has(i) && used.size < ICON_NAMES.length) i = (i + 1) % ICON_NAMES.length;
     used.add(i);
     next.get(p).icon = i;
   }
   next.key = key;
   tags = next;
 }
-const tag = (path) => {
-  const t = tags.get(path) ?? { icon: hash(path) % ICONS.length, hue: hash(`${path}#`) % 360 };
-  return `<span class="tag" style="--c:hsl(${t.hue} 58% 44%)" aria-hidden="true"><svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor">${ICONS[t.icon]}</svg></span>`;
+const tagEl = (path) => {
+  const t = tags.get(path) ?? { icon: hash(path) % ICON_NAMES.length, hue: hash(`${path}#`) % 360 };
+  return `<span class="tg" style="--tc:hsl(${t.hue} 62% 46%)" aria-hidden="true"><svg viewBox="0 0 24 24">${LUCIDE[ICON_NAMES[t.icon]]}</svg></span>`;
 };
+
+/* ---- mở thread trong Claude desktop ---- */
+const openUrl = (id) => `claude://code/continue?session=${encodeURIComponent(id)}`;
+const openLink = (id, label) => `<a class="open" href="${esc(openUrl(id))}" title="Open this thread in Claude desktop">${label}${ui('external-link')}</a>`;
 
 const groups = () => state.data?.groups ?? [];
 const members = (g) => [g, ...g.children.flatMap((c) => [c, ...c.children])];
-const matches = (g) => !state.q || members(g).some((m) => fold(m.title).includes(fold(state.q)));
-const visible = () => groups().filter((g) => (state.folder === 'all' || g.path === state.folder) && matches(g));
 const findGroup = (id) => groups().find((g) => members(g).some((m) => m.id === id));
 
-function chips() {
-  const gs = groups();
-  const paths = [...new Map(gs.map((g) => [g.path, g.folder])).entries()];
-  if (state.folder !== 'all' && !paths.some(([p]) => p === state.folder)) state.folder = 'all';
-  const all = [['all', 'Tất cả', gs.length, false], ...paths.map(([p, f]) => [p, f, gs.filter((g) => g.path === p).length, true])];
-  $('#chips').innerHTML = all.map(([k, n, c, icon]) =>
-    `<button class="chip" data-f="${esc(k)}" aria-pressed="${state.folder === k}">${icon ? tag(k) : ''}${esc(n)} <span class="count">${c}</span></button>`).join('');
+/* ---- thẻ ---- */
+function lineHtml(g) {
+  const l = g.line;
+  if (!l) return '<p class="sum nosum">No messages yet</p>';
+  const from = g.latestFrom ? (g.latestFrom.length > 28 ? `${g.latestFrom.slice(0, 27)}…` : g.latestFrom) : '';
+  const who = from ? `<span class="from">${esc(from)}</span>` : l.kind === 'message' && l.role === 'user' ? '<span class="from">You</span>' : l.stale ? '<span class="from">Previous turn</span>' : '';
+  return `<p class="sum">${who}${esc(l.text)}</p>`;
 }
-
-function meta(g) {
-  const n = members(g).length - 1;
-  return `<span class="meta">${state.group ? '' : `<span class="folder">${tag(g.path)}${esc(g.folder)}</span>`}${g.starred ? '<span class="badge pin">GHIM</span>' : ''}${n && g.status === 'done' ? `<span class="badge team">★ ${n} THREAD CON</span>` : ''}<span class="since">${ago(g.activityAt)}</span></span>`;
-}
-
-/** Thẻ: chỉ tên thread, các thread con (đang ở trạng thái nào) và nhãn dự án. Chi tiết nằm trong timeline. */
-function card(g) {
-  const subs = g.status !== 'done' && g.children.length
-    ? `<div class="subs">${g.children.map((c) => `<button class="sub-row" data-id="${esc(c.id)}" style="--s:${SC[c.status]}"><span class="st"></span><span class="sn">${esc(c.title)}</span>${c.folder !== g.folder ? `<span class="fl">${esc(c.folder)}</span>` : ''}<span class="ss">${LABEL[c.status]}</span></button>`).join('')}</div>`
+function cardHtml(g) {
+  const ks = g.children;
+  const kids = g.status !== 'done' && ks.length
+    ? `<ul class="kids">${ks.map((c) => `<li><button class="kid-btn" data-id="${esc(c.id)}" style="--c:${ST[c.status].c}">${ui('corner-down-right')}<span class="kt">${esc(c.title)}</span>${c.folder !== g.folder ? `<span class="kf">${esc(c.folder)}</span>` : ''}<span class="ks">${ST[c.status].name}</span></button></li>`).join('')}</ul>`
     : '';
-  return `<div class="card"><button class="main" data-id="${esc(g.id)}"><span class="t">${esc(g.title)}</span></button>${subs}${meta(g)}</div>`;
+  // số thread con nằm ngay dưới phần tóm tắt (thread chưa xong thì liệt kê từng thread con)
+  const count = g.status === 'done' && ks.length ? `<span class="badge kc">+${ks.length} thread</span>` : '';
+  const pin = g.status !== 'input' && g.starred ? `<span class="pin">${ui('pin')}PINNED</span>` : '';
+  // cần input: nút đầy đủ "Mở trong Claude" (mở đúng thread đang chờ); còn lại: chỉ một nút biểu tượng. Cả hai nằm bên trái giờ.
+  const open = g.status === 'input'
+    ? openLink(g.leadId, 'Open in Claude')
+    : `<a class="open-sm" href="${esc(openUrl(g.id))}" aria-label="Open &quot;${esc(g.title)}&quot; in Claude" title="Open in Claude">${ui('external-link')}</a>`;
+  const run = g.status === 'work' && g.leadRun ? `<span class="runchip"><i class="led"></i>PID ${g.leadRun.pid}</span>` : '';
+  const head = `<div class="chead"><span class="cs">${ui(ST[g.status].icon)}${{ input: 'NEEDS INPUT', work: 'RUNNING', done: 'DONE' }[g.status]}</span><span class="cid proj">${tagEl(g.path)}<span class="pn">${esc(g.folder)}</span></span></div>`;
+  return `${head}<button class="main" data-id="${esc(g.id)}"><span class="title">${esc(g.title)}</span>${lineHtml(g)}</button>${kids}
+    <div class="foot"><div class="fr-act">${open}${pin}${count}${run || `<time data-at="${g.activityAt}"></time>`}</div></div>`;
 }
 
-function doneColumn(list) {
-  const out = BUCKETS.map(([k, name]) => {
-    const items = list.filter((g) => g.bucket === k);
-    if (!items.length) return '';
-    const open = state.q ? true : state.open[k];
-    return `<section class="bucket"><button class="bhead" data-bucket="${k}" aria-expanded="${open}"><span class="chev">▸</span>${name}<span class="n">${items.length}</span></button>${open ? items.map(card).join('') : ''}</section>`;
+const els = new Map();
+function flash(el) { el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); }
+/** Mốc thời gian (ms) đầu của khoảng đang chọn; thread đã xong cũ hơn mốc này bị ẩn. Cần input và đang chạy luôn hiện. */
+function cutoff() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return { '1d': d.getTime(), '3d': Date.now() - 3 * 86400000, all: 0 }[state.range];
+}
+/** Danh sách thẻ của bảng: lọc theo dự án, trạng thái, khoảng thời gian (chỉ cho thread xong); cần input trước, rồi đang chạy, rồi xong. */
+function boardList() {
+  const from = cutoff();
+  return groups()
+    .filter((g) => (state.folder === 'all' || g.path === state.folder) && (!state.pinned || g.starred) && (state.status === 'all' || g.status === state.status) && (g.status !== 'done' || g.activityAt >= from))
+    .sort((a, b) => ORDER[a.status] - ORDER[b.status] || b.activityAt - a.activityAt);
+}
+
+function messageEl(text) {
+  const el = document.createElement('div');
+  el.className = 'empty';
+  el.textContent = text;
+  return el;
+}
+
+/** Cập nhật lưới theo id thread. quiet = không chạy hiệu ứng (lần đầu, đổi bộ lọc). */
+function sync(quiet) {
+  const all = groups();
+  const list = boardList();
+  const host = $('#flow');
+
+  const first = new Map();
+  for (const [id, el] of els) if (el.isConnected) first.set(id, el.getBoundingClientRect());
+
+  // lần vẽ đầu tiên có thẻ: chuỗi "bật nguồn" ngắn
+  const booting = !state.booted && list.length > 0;
+  if (booting) { state.booted = true; host.classList.add('boot'); setTimeout(() => host.classList.remove('boot'), 1400); }
+  const seen = new Set();
+  const frag = [];
+  const doneTotal = list.filter((g) => g.status === 'done').length;
+  let doneShown = 0;
+  for (const g of list) {
+    seen.add(g.id);
+    let el = els.get(g.id), fresh = false;
+    if (!el) { el = document.createElement('article'); el.className = 'card'; els.set(g.id, el); fresh = true; }
+    const html = cardHtml(g), sig = `${g.status}|${html}`;
+    if (el.dataset.sig !== sig) {
+      const changed = el.dataset.s && el.dataset.s !== g.status;
+      el.innerHTML = html;
+      el.dataset.sig = sig;
+      el.dataset.s = g.status;
+      if (changed && !quiet) flash(el);
+    }
+    if (g.status === 'done') {
+      if (!state.more && doneShown >= DONE_CAP) continue;
+      doneShown++;
+    }
+    frag.push(el);
+    if (!quiet || booting) el.style.setProperty('--i', String(frag.length - 1));
+    if (fresh && !quiet) el.classList.add('enter');
+  }
+  if (doneTotal > doneShown) {
+    const b = document.createElement('button');
+    b.className = 'more-btn';
+    b.dataset.more = '1';
+    b.textContent = `Show ${doneTotal - doneShown} more finished threads`;
+    frag.push(b);
+  }
+  if (!list.length) frag.push(messageEl(all.length ? 'No threads match the filters.' : 'No threads to show yet.'));
+  const cur = [...host.children];
+  const same = cur.length === frag.length && cur.every((c, i) => c === frag[i] || (!els.has(c.dataset?.id ?? '') && c.className === frag[i].className && c.isEqualNode(frag[i])));
+  if (!same) host.replaceChildren(...frag);
+
+  for (const [id, el] of els) if (!seen.has(id)) { el.remove(); els.delete(id); }
+  for (const [id, el] of els) { const g = list.find((x) => x.id === id); const t = el.querySelector('time'); if (g && t) t.textContent = ago(g.activityAt, true); }
+
+  if (!quiet && !prefersReduced()) {
+    for (const [id, el] of els) {
+      const a = first.get(id);
+      if (!a || !el.isConnected) continue;
+      const b = el.getBoundingClientRect(), dx = a.left - b.left, dy = a.top - b.top;
+      if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
+      el.style.transition = 'none';
+      el.style.transform = `translate(${dx}px, ${dy}px)`;
+      requestAnimationFrame(() => {
+        el.style.transition = 'transform .24s var(--ease-out)';
+        el.style.transform = '';
+        setTimeout(() => { el.style.transition = ''; }, 260);
+      });
+    }
+  }
+  counts();
+  for (const b of document.querySelectorAll('#range button')) b.setAttribute('aria-pressed', String(state.range === b.dataset.range));
+}
+
+function rangeBar() {
+  const host = $('#range');
+  if (host.dataset.ready) return;
+  host.dataset.ready = '1';
+  host.innerHTML = `${RANGES.map(([k, n]) => `<button data-range="${k}" aria-pressed="false">${n}</button>`).join('')}`;
+}
+
+function chips() {
+  const host = $('#chips');
+  const folders = state.data?.folders ?? [];
+  if (state.folder !== 'all' && !folders.some((f) => f.path === state.folder)) { state.folder = 'all'; save(); }
+  const items = [['all', 'All'], ...folders.map((f) => [f.path, f.folder])];
+  const sig = items.map((i) => i.join(':')).join('|') + state.folder + state.pinned;
+  if (host.dataset.sig === sig) return;
+  host.dataset.sig = sig;
+  const pinChip = `<button class="chip pinf" data-pinned aria-pressed="${state.pinned}" title="Show only pinned threads">${ui('pin')}Pinned</button><i class="chip-sep" aria-hidden="true"></i>`;
+  const chipHtml = items.map(([k, n]) => `<button class="chip ${k === 'all' ? 'all' : ''}" data-f="${esc(k)}" aria-pressed="${state.folder === k}">${k === 'all' ? '' : tagEl(k)}${esc(n)}</button>`).join('');
+  const cut = chipHtml.indexOf('</button>') + 9;
+  host.innerHTML = chipHtml.slice(0, cut) + pinChip + chipHtml.slice(cut);
+}
+
+/* ---- tab Dự án: thread của dự án ở trên, ô chọn để chỉ xem việc của vài thread, rồi "đang làm gì" / "đã làm được" ---- */
+/** Mọi thread của một nhóm (gốc, con, cháu) với trạng thái riêng của từng thread. */
+function flat(g) {
+  const out = [{ id: g.id, title: g.title, depth: 0, ...g.own }];
+  const walk = (c, depth) => { out.push({ id: c.id, title: c.title, depth, status: c.status, detail: c.detail, stale: c.stale, latest: c.latest, activityAt: c.activityAt }); c.children.forEach((k) => walk(k, depth + 1)); };
+  g.children.forEach((c) => walk(c, 1));
+  return out;
+}
+/** Dòng mô tả việc của một thread: đang chạy thì tin mới nhất, còn lại thì tóm tắt của Claude (nếu có). */
+const workText = (m) => (m.status === 'work' ? (m.latest?.text ?? m.detail) : (m.detail ?? m.latest?.text)) ?? '';
+const RANK = { input: 0, work: 1, done: 2 };
+
+function workItem(m) {
+  const text = workText(m);
+  return `<li class="witem" style="--c:${ST[m.status].c}"><span class="wic">${ui(ST[m.status].icon)}</span><div class="wbody"><button class="wt" data-id="${esc(m.id)}">${esc(m.title)}</button><p class="${text ? '' : 'nosum'}">${text ? esc(text) : 'No summary yet'}</p></div><time>${ago(m.activityAt, true)}</time></li>`;
+}
+
+function projectsHtml() {
+  const fs = (state.data?.folders ?? []).filter((f) => (state.folder === 'all' || f.path === state.folder) && (!state.pinned || groups().some((g) => g.path === f.path && g.starred)));
+  if (!fs.length) return `<div class="empty">${state.pinned ? 'No pinned threads.' : 'No projects.'}</div>`;
+  return fs.map((f) => {
+    const all = groups().filter((g) => g.path === f.path && (!state.pinned || g.starred)).flatMap(flat);
+    const picked = all.filter((m) => state.pick.has(m.id));
+    const shown = picked.length ? picked : all;
+    const doing = shown.filter((m) => m.status !== 'done').sort((a, b) => RANK[a.status] - RANK[b.status] || b.activityAt - a.activityAt);
+    const doneAll = shown.filter((m) => m.status === 'done').sort((a, b) => b.activityAt - a.activityAt);
+    const done = doneAll.slice(0, picked.length ? 20 : 6);
+    const stat = (k, label) => (f.count[k] ? `<span class="stat" style="--c:${ST[k].c}">${ui(ST[k].icon)}${f.count[k]} ${label}</span>` : '');
+    const rows = all.map((m) => `<div class="trow ${m.depth ? 'c' : ''}" style="--c:${ST[m.status].c}" ${m.depth > 1 ? `data-d="${m.depth}"` : ''}>
+        <input type="checkbox" data-pick="${esc(m.id)}" ${state.pick.has(m.id) ? 'checked' : ''} aria-label="Show only the work of thread ${esc(m.title)}">
+        <span class="tic" title="${ST[m.status].name}">${ui(ST[m.status].icon)}</span>
+        <button class="tn" data-id="${esc(m.id)}">${esc(m.title)}</button>
+        <time>${ago(m.activityAt, true)}</time>
+        <a class="open-sm row" href="${esc(openUrl(m.id))}" aria-label="Open &quot;${esc(m.title)}&quot; in Claude" title="Open in Claude">${ui('external-link')}</a>
+      </div>`).join('');
+    return `<article class="pcard">
+      <div class="p-head">${tagEl(f.path)}<div class="p-id"><h3>${esc(f.folder)}</h3><div class="p-path" title="${esc(f.path)}">${esc(f.path)}</div></div></div>
+      <div class="stats">${stat('input', 'needs input')}${stat('work', 'running')}${stat('done', 'done')}</div>
+      <section><p class="lbl">Threads in project · ${all.length}</p><div class="threads">${rows}</div></section>
+      ${picked.length ? `<div class="pickbar"><span>Showing the work of ${picked.length} threads</span><button class="link" data-clearpick="${esc(f.path)}">Clear selection</button></div>` : ''}
+      <section><p class="lbl">In progress · ${doing.length}</p>${doing.length ? `<ul class="wlist">${doing.map(workItem).join('')}</ul>` : '<p class="d">Nothing in progress.</p>'}</section>
+      <section><p class="lbl">Finished · ${doneAll.length}</p>${done.length ? `<ul class="wlist">${done.map(workItem).join('')}</ul>${doneAll.length > done.length ? `<p class="d more">and ${doneAll.length - done.length} more finished threads; tick a thread above to see it on its own.</p>` : ''}` : '<p class="d">No results yet.</p>'}</section>
+    </article>`;
   }).join('');
-  return out || '<div class="empty">Không có thread.</div>';
 }
 
-function columns(list) {
-  return `<div class="board">${COLS.map((c) => {
-    const items = list.filter((g) => g.status === c.k);
-    const body = c.k === 'done' ? doneColumn(items) : items.length ? items.map(card).join('') : '<div class="empty">Không có thread.</div>';
-    return `<section class="col" data-s="${c.k}" style="--s:${c.c}"><h2><span class="pill"></span>${c.name}<span class="n">${items.length}</span></h2><div class="cards">${body}</div></section>`;
-  }).join('')}</div>`;
+/* ---- markdown rút gọn cho timeline: đoạn, danh sách, in đậm/nghiêng, mã, trích dẫn, liên kết http(s). Luôn thoát HTML trước. ---- */
+function mdInline(s) {
+  const codes = [];
+  s = s.replace(/`([^`\n]+)`/g, (_, c) => { codes.push(c); return `\u0000${codes.length - 1}\u0000`; });
+  s = s.replace(/\*\*([^*\n]+?)\*\*/g, '<strong>$1</strong>');
+  s = s.replace(/(^|[^*\w])\*([^*\s][^*\n]*?)\*(?!\*)/g, '$1<em>$2</em>');
+  s = s.replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+  return s.replace(/\u0000(\d+)\u0000/g, (_, i) => `<code>${codes[i]}</code>`);
+}
+function md(text) {
+  const lines = esc(text).split('\n');
+  const bullet = /^\s*[-*•]\s+/, ordered = /^\s*\d+[.)]\s+/, quote = /^&gt;\s?/, special = /^(```|#{1,6}\s|\s*[-*•]\s|\s*\d+[.)]\s|&gt;)/;
+  const out = [];
+  let i = 0;
+  while (i < lines.length) {
+    const l = lines[i];
+    if (/^```/.test(l)) {
+      const buf = [];
+      for (i++; i < lines.length && !/^```/.test(lines[i]); i++) buf.push(lines[i]);
+      i++;
+      out.push(`<pre><code>${buf.join('\n')}</code></pre>`);
+    } else if (!l.trim()) i++;
+    else if (/^#{1,6}\s+/.test(l)) { out.push(`<p class="md-h">${mdInline(l.replace(/^#{1,6}\s+/, ''))}</p>`); i++; }
+    else if (bullet.test(l) || ordered.test(l)) {
+      const re = bullet.test(l) ? bullet : ordered, tag = re === bullet ? 'ul' : 'ol', items = [];
+      while (i < lines.length && re.test(lines[i])) items.push(lines[i++].replace(re, ''));
+      out.push(`<${tag}>${items.map((x) => `<li>${mdInline(x)}</li>`).join('')}</${tag}>`);
+    } else if (quote.test(l)) {
+      const buf = [];
+      while (i < lines.length && quote.test(lines[i])) buf.push(lines[i++].replace(quote, ''));
+      out.push(`<blockquote>${buf.map(mdInline).join('<br>')}</blockquote>`);
+    } else {
+      const buf = [];
+      while (i < lines.length && lines[i].trim() && (!buf.length || !special.test(lines[i]))) buf.push(lines[i++]);
+      out.push(`<p>${buf.map(mdInline).join('<br>')}</p>`);
+    }
+  }
+  return out.join('');
 }
 
-function board() {
-  const list = visible();
-  $('#count').textContent = `${list.length} nhóm thread`;
-  if (!groups().length) return '<div class="empty">Chưa có thread nào để hiển thị.</div>';
-  if (!state.group) return columns(list);
-  const paths = [...new Map(list.map((g) => [g.path, g.folder])).entries()];
-  return paths.map(([p, f]) => {
-    const l = list.filter((g) => g.path === p);
-    return `<div class="lane"><h3>${tag(p)}${esc(f)} <small>${esc(p)} · ${l.length} nhóm</small></h3>${columns(l)}</div>`;
-  }).join('') || '<div class="empty">Không có thread khớp.</div>';
-}
-
-function node(t, child) {
-  return `<button class="node ${child ? 'c' : ''}" data-id="${esc(t.id)}" style="--s:${SC[t.status]}"><span class="st"></span><span>${esc(t.title)}</span></button>`;
-}
-
-function projects() {
-  const fs = (state.data?.folders ?? []).filter((f) => state.folder === 'all' || f.path === state.folder);
-  $('#count').textContent = `${fs.length} dự án`;
-  if (!fs.length) return '<div class="empty">Không có dự án.</div>';
-  return `<div class="projects">${fs.map((f) => {
-    const gs = groups().filter((g) => g.path === f.path);
-    const stat = (k, label) => (f.count[k] ? `<span class="stat ${k}">${f.count[k]} ${label}</span>` : '');
-    return `<article class="proj"><div><h3>${tag(f.path)}${esc(f.folder)}</h3><div class="path">${esc(f.path)}</div></div>
-      <div class="stats">${stat('input', 'cần input')}${stat('work', 'đang làm')}${stat('done', 'xong')}</div>
-      <div><p class="lbl">Đang làm gì</p>${f.doing.length ? `<ul>${f.doing.map((d) => `<li><b>${esc(d.title)}:</b> ${esc(d.detail)}</li>`).join('')}</ul>` : '<span class="d">Không có việc dở.</span>'}</div>
-      <div><p class="lbl">Đã làm được</p>${f.done.length ? `<ul>${f.done.map((d) => `<li>${esc(d.detail)} <span class="count">${ago(d.activityAt)}</span></li>`).join('')}</ul>` : '<span class="d">Chưa có kết quả.</span>'}</div>
-      <div><p class="lbl">Thread trong dự án</p><div class="tree">${gs.map((g) => node(g, false) + g.children.map((c) => node(c, true)).join('')).join('')}</div></div></article>`;
-  }).join('')}</div>`;
-}
-
-/* ---- ngăn chi tiết: tóm tắt nhóm + timeline của thread đang chọn ---- */
+/* ---- ngăn chi tiết + timeline ---- */
+let lastFocus = null;
 function timelineHtml(g, m) {
   const tl = state.timeline && state.timeline.id === m.id ? state.timeline : null;
   const events = [];
-  for (const c of g.children) if (c.createdAt && m.id === g.id) events.push({ at: c.createdAt, html: `<span class="ev-k">Thread con</span> <b>${esc(c.title)}</b> được tạo` });
-  if (m.createdAt) events.push({ at: m.createdAt, html: '<span class="ev-k">Tạo thread</span>' });
+  if (m.id === g.id) for (const c of g.children) if (c.createdAt) events.push({ at: c.createdAt, html: `<div><span class="who">SUB-THREAD</span><b>${esc(c.title)}</b> created</div>` });
+  if (m.createdAt) events.push({ at: m.createdAt, html: '<div><span class="who">THREAD</span>Created</div>' });
   for (const t of tl?.turns ?? []) {
-    const tools = t.tools.length ? `<div class="ev-tools">${t.tools.slice(0, 8).map((x) => `<span class="badge">${esc(x.name)} ×${x.n}</span>`).join('')}${t.tools.length > 8 ? `<span class="badge">+${t.tools.length - 8}</span>` : ''}</div>` : '';
-    events.push({ at: t.at, html: `<div class="ev-you"><span class="ev-k">Bạn</span> ${esc(t.prompt)}</div>${tools}${t.reply ? `<div class="ev-ai"><span class="ev-k">Claude</span> ${esc(t.reply)}</div>` : ''}${t.durationMs > 20000 ? `<div class="ev-dur">${span(t.durationMs)}</div>` : ''}` });
+    const tools = t.tools.length ? `<div class="tools-row">${t.tools.slice(0, 8).map((x) => `<span class="tool">${esc(x.name)} ×${x.n}</span>`).join('')}${t.tools.length > 8 ? `<span class="tool">+${t.tools.length - 8}</span>` : ''}</div>` : '';
+    events.push({ at: t.at, html: `<div class="you"><span class="who">YOU</span><div class="md">${md(t.prompt)}</div></div>${tools}${t.reply ? `<div class="ai"><span class="who">CLAUDE</span><div class="md">${md(t.reply)}</div></div>` : ''}${t.durationMs > 20000 ? `<div class="dur">${span(t.durationMs)}</div>` : ''}` });
   }
   events.sort((a, b) => b.at - a.at);
   let note = '';
-  if (!tl) note = '<p class="d">Đang tải timeline…</p>';
+  if (!tl) note = '<p class="d">Loading timeline…</p>';
   else if (tl.error) note = `<p class="d">${esc(tl.error)}</p>`;
-  else if (tl.tooBig) note = '<p class="d">Tệp hội thoại quá lớn nên không hiển thị timeline.</p>';
-  else if (!tl.found) note = '<p class="d">Không tìm thấy tệp hội thoại của thread này, nên chỉ có các mốc cơ bản.</p>';
-  else if (tl.omitted) note = `<p class="d">Chỉ hiển thị các lượt gần nhất, ${tl.omitted} lượt cũ hơn được ẩn.</p>`;
-  return `${note}<ol class="timeline">${events.map((e) => `<li><span class="ev-t">${clock(e.at)}</span><div class="ev-b">${e.html}</div></li>`).join('')}</ol>`;
+  else if (tl.tooBig) note = '<p class="d">The transcript is too large to show a timeline.</p>';
+  else if (!tl.found) note = '<p class="d">The transcript for this thread was not found, so only basic milestones are shown.</p>';
+  else if (tl.omitted) note = `<p class="d">Showing only the most recent turns; ${tl.omitted} older turns are hidden.</p>`;
+  return `${note}<ol class="tl">${events.map((e) => `<li><span class="tt">${esc(clock(e.at))}</span><div class="tb">${e.html}</div></li>`).join('')}</ol>`;
 }
 
-async function loadTimeline(id) {
-  try {
-    const res = await fetch(`/api/timeline?id=${encodeURIComponent(id)}`, { cache: 'no-store' });
-    const data = await res.json();
-    if (state.member !== id) return;
-    state.timeline = res.ok ? data : { id, error: data.error || 'Không tải được timeline.', turns: [] };
-  } catch {
-    if (state.member !== id) return;
-    state.timeline = { id, error: 'Không tải được timeline.', turns: [] };
-  }
-  drawer();
-}
-
-function openThread(id) {
-  const g = findGroup(id);
-  if (!g) return;
-  state.sel = g.id; state.member = id; state.timeline = null;
-  drawer();
-  loadTimeline(id);
+function drawerHtml(g, m) {
+  const all = [g, ...g.children];
+  const asking = g.status === 'input' ? members(g).find((x) => x.id === g.leadId) ?? g : null;
+  const summary = m.detail ? `<div><p class="lbl">${m.status === 'work' ? 'Summary of the previous turn' : 'Claude\'s summary'}</p><p class="d">${esc(m.detail)}</p></div>` : '';
+  return `<div class="d-top"><span class="pillst" style="--c:${ST[g.status].c}">${ui(ST[g.status].icon)}${ST[g.status].name}</span><button class="btn" id="dclose" aria-label="Close">${ui('x')}Close</button></div>
+    <div><h2>${esc(g.title)}</h2><div class="path">${tagEl(g.path)}${esc(g.path)}</div></div>
+    <div class="idline"><span>ID <b>${esc(m.id)}</b></span>${(m.run ?? (m.id === g.id ? g.own?.run : null)) ? `<span>PID <b>${(m.run ?? g.own.run).pid}</b> · ${esc((m.run ?? g.own.run).status ?? '')}</span>` : ''}</div>
+    ${asking?.detail ? `<div><p class="lbl">Waiting for you</p><div class="ask">${esc(asking.detail)}</div></div>` : ''}
+    <div>${openLink(m.id, m.status === 'input' ? 'Open in Claude to reply' : 'Open this thread in Claude')}</div>
+    ${all.length > 1 ? `<div><p class="lbl">Threads in this group</p><div class="members" role="tablist">${all.map((x) => `<button class="mem" role="tab" data-member="${esc(x.id)}" aria-selected="${x.id === m.id}" style="--c:${ST[x.status].c}"><span class="mst"></span>${esc(x.title)}<span class="ms">${ST[x.status].name}</span></button>`).join('')}</div></div>` : ''}
+    ${summary}
+    <div><p class="lbl">Timeline${all.length > 1 ? `: ${esc(m.title)}` : ''}</p>${timelineHtml(g, m)}</div>
+    <div class="hint">This page only shows status. The "Open in Claude" button uses the claude:// link of Claude desktop; if nothing happens, open the thread from Claude desktop's own list. Status is derived from Claude's automatic summaries, so it may not always be accurate.</div>`;
 }
 
 function drawer() {
   const d = $('#drawer');
   const g = state.sel && groups().find((x) => x.id === state.sel);
-  $('#scrim').hidden = !g;
-  d.classList.toggle('open', !!g);
-  if (!g) { d.innerHTML = ''; return; }
-  const all = [g, ...g.children];
-  const m = all.find((x) => x.id === state.member) ?? g;
-  const keep = d.querySelector('.timeline-wrap')?.scrollTop ?? 0;
-  d.innerHTML = `<button class="x" id="close">Đóng</button>
-    <div><span class="status ${g.status}">${LABEL[g.status]}</span> <span class="count">&nbsp;${ago(g.activityAt)}</span></div>
-    <h2>${esc(g.title)}</h2>
-    <div class="folder">${tag(g.path)}${esc(g.path)}</div>
-    ${g.status === 'input' && g.detail ? `<div><p class="lbl">Đang chờ bạn</p><div class="quote">${esc(g.detail)}</div></div>` : ''}
-    ${g.status === 'work' && g.detail ? `<div><p class="lbl">Tóm tắt lượt trước</p><div class="d">${esc(g.detail)}</div></div>` : ''}
-    ${g.status === 'done' && g.detail ? `<div><p class="lbl">Kết quả</p><div class="d">${esc(g.detail)}</div></div>` : ''}
-    ${all.length > 1 ? `<div class="members" role="tablist" aria-label="Thread trong nhóm">${all.map((x) => `<button class="mem" role="tab" data-member="${esc(x.id)}" aria-selected="${x.id === m.id}" style="--s:${SC[x.status]}"><span class="st"></span>${esc(x.title)}<span class="ss">${LABEL[x.status]}</span></button>`).join('')}</div>` : ''}
-    <div class="timeline-wrap"><p class="lbl">Timeline${all.length > 1 ? `: ${esc(m.title)}` : ''}</p>${timelineHtml(g, m)}</div>
-    ${g.status !== 'work' ? '<p class="d">Trạng thái lấy từ tóm tắt tự động của Claude, có thể chưa chính xác.</p>' : ''}
-    <div class="hint">Muốn trả lời hoặc yêu cầu làm tiếp, mở thread này trong Claude desktop. Trang này chỉ hiển thị trạng thái.</div>`;
-  const w = d.querySelector('.timeline-wrap');
-  if (w) w.scrollTop = keep;
+  if (!g) { if (d.classList.contains('on')) closeDrawer(true); return; }
+  const m = members(g).find((x) => x.id === state.member) ?? g;
+  const top = d.scrollTop;
+  d.innerHTML = drawerHtml(g, m);
+  d.scrollTop = top;
 }
 
-function render() {
-  assignTags((state.data?.folders ?? []).map((f) => f.path));
-  chips();
-  $('#groupSeg').style.display = state.tab === 'board' ? '' : 'none';
-  $('#g0').setAttribute('aria-pressed', String(!state.group));
-  $('#g1').setAttribute('aria-pressed', String(state.group));
-  $('#tab-board').setAttribute('aria-selected', String(state.tab === 'board'));
-  $('#tab-proj').setAttribute('aria-selected', String(state.tab === 'proj'));
-  $('#main').innerHTML = state.tab === 'board' ? board() : projects();
+function openDrawer(id) {
+  const g = findGroup(id);
+  if (!g) return;
+  lastFocus = document.activeElement;
+  state.sel = g.id;
+  state.member = id;
+  state.timeline = null;
+  drawer();
+  $('#drawer').classList.add('on');
+  $('#scrim').classList.add('on');
+  $('#drawer').focus({ preventScroll: true });
+  history.replaceState(null, '', `#thread=${encodeURIComponent(id)}`);
+  loadTimeline(id);
+}
+function closeDrawer(silent) {
+  state.sel = null;
+  state.member = null;
+  $('#drawer').classList.remove('on');
+  $('#scrim').classList.remove('on');
+  history.replaceState(null, '', location.pathname + location.search);
+  if (!silent && lastFocus && lastFocus.isConnected) lastFocus.focus({ preventScroll: true });
+}
+async function loadTimeline(id) {
+  try {
+    const res = await fetch(`/api/timeline?id=${encodeURIComponent(id)}`, { cache: 'no-store' });
+    const data = await res.json();
+    if (state.member !== id) return;
+    state.timeline = res.ok ? data : { id, error: data.error || 'Could not load the timeline.', turns: [] };
+  } catch {
+    if (state.member !== id) return;
+    state.timeline = { id, error: 'Could not load the timeline.', turns: [] };
+  }
   drawer();
 }
 
+/* ---- giao diện sáng/tối ---- */
+function applyTheme() {
+  if (state.theme === 'auto') document.documentElement.removeAttribute('data-theme');
+  else document.documentElement.setAttribute('data-theme', state.theme);
+  const [, name, ic] = THEMES.find((x) => x[0] === state.theme) ?? THEMES[0];
+  $('#themeTx').textContent = name;
+  $('#themeIc').innerHTML = LUCIDE_UI[ic];
+}
+
+/* ---- vẽ lại ---- */
+function render(quiet) {
+  assignTags((state.data?.folders ?? []).map((f) => f.path));
+  chips();
+  rangeBar();
+  $('#range').style.display = state.tab === 'board' ? '' : 'none'; // khoảng thời gian chỉ áp cho bảng, trang Dự án không dùng
+  $('#tab-board').setAttribute('aria-selected', String(state.tab === 'board'));
+  $('#tab-proj').setAttribute('aria-selected', String(state.tab === 'proj'));
+  $('#board').hidden = state.tab !== 'board';
+  $('#projects').hidden = state.tab !== 'proj';
+  sync(quiet);
+  if (state.tab === 'proj') $('#projects').innerHTML = projectsHtml();
+  if (state.sel) drawer();
+}
 function setBanner(text) {
   const b = $('#banner');
   b.hidden = !text;
   b.textContent = text || '';
 }
-
+/** Số thread theo trạng thái ở thanh đáy; bấm một số để chỉ xem trạng thái đó, bấm lần nữa để bỏ lọc. */
+function counts() {
+  const gs = groups();
+  const n = (k) => gs.filter((g) => g.status === k).length;
+  const ni = n('input'), nw = n('work'), nd = n('done');
+  // đèn sáng theo mức cần chú ý: có input và/hoặc đang chạy thì sáng các đèn đó, đèn done tắt; chỉ còn done thì sáng đèn done
+  const lit = { input: ni > 0, work: nw > 0, done: nd > 0 && ni === 0 && nw === 0 };
+  const num = { input: ni, work: nw, done: nd };
+  const html = ['input', 'work', 'done'].map((k) => `<button data-status="${k}" data-lit="${lit[k]}" aria-pressed="${state.status === k}" title="${ST[k].name}: click to filter" style="--c:${ST[k].c}"><i class="led"></i>${{ input: 'INPUT', work: 'RUN', done: 'DONE' }[k]} <b>${String(num[k]).padStart(2, '0')}</b></button>`).join('');
+  const host = $('#sb-counts');
+  if (host.dataset.sig !== html) { host.dataset.sig = html; host.innerHTML = html; }
+}
+/** Tình trạng kết nối (đèn LIVE) ở góc phải thanh trên. */
+function statusBar(ok) {
+  $('#sb-led').className = `led ${ok ? 'live' : 'off'}`;
+  $('#sb-state').textContent = ok ? 'LIVE' : 'DISCONNECTED';
+}
+let firstLoad = true;
 async function poll() {
   try {
     const res = await fetch('/api/board', { cache: 'no-store' });
     const raw = await res.text();
-    if (!res.ok) throw new Error(`Máy chủ trả lỗi ${res.status}`);
+    if (!res.ok) throw new Error(`server returned ${res.status}`);
     const data = JSON.parse(raw);
     setBanner((data.warnings || []).join(' '));
     if (raw !== state.raw) {
       state.raw = raw;
       state.data = data;
-      render();
+      render(firstLoad);
       if (state.member) loadTimeline(state.member); // thread đang mở có thể vừa có thêm lượt mới
+      if (firstLoad) {
+        const m = /^#thread=(.+)$/.exec(location.hash);
+        if (m) openDrawer(decodeURIComponent(m[1]));
+      }
+      firstLoad = false;
+    } else {
+      sync(true); // dữ liệu không đổi: chỉ làm mới nhãn thời gian
     }
-    $('#upd').textContent = `Cập nhật ${new Date().toLocaleTimeString('vi-VN')} · tự làm mới mỗi ${POLL_MS / 1000} giây`;
+    $('#stamp').textContent = new Date().toLocaleTimeString('en-GB');
+    statusBar(true);
   } catch (e) {
-    setBanner(`Không kết nối được máy chủ (${e.message}). Đang hiển thị dữ liệu lần cuối${state.data ? '' : ' (chưa có)'}.`);
+    setBanner(`Cannot reach the server (${e.message}). Showing the last data${state.data ? '' : ' (none yet)'}.`);
+    statusBar(false);
   }
 }
 
+document.addEventListener('change', (e) => {
+  const c = e.target.closest?.('input[data-pick]');
+  if (!c) return;
+  if (c.checked) state.pick.add(c.dataset.pick); else state.pick.delete(c.dataset.pick);
+  $('#projects').innerHTML = projectsHtml();
+  $(`input[data-pick="${CSS.escape(c.dataset.pick)}"]`)?.focus({ preventScroll: true });
+});
+document.addEventListener('animationend', (e) => { e.target.classList?.remove('enter', 'flash'); });
 document.addEventListener('click', (e) => {
   const b = e.target.closest('button, #scrim');
   if (!b) return;
-  if (b.dataset.f !== undefined) { state.folder = b.dataset.f; save(); render(); }
-  else if (b.dataset.bucket) { state.open[b.dataset.bucket] = !state.open[b.dataset.bucket]; save(); render(); }
+  if (b.hasAttribute('data-pinned')) { state.pinned = !state.pinned; state.more = false; save(); render(true); }
+  else if (b.dataset.f !== undefined) { state.folder = b.dataset.f; save(); render(true); }
+  else if (b.dataset.clearpick) {
+    for (const g of groups().filter((x) => x.path === b.dataset.clearpick)) for (const m of flat(g)) state.pick.delete(m.id);
+    $('#projects').innerHTML = projectsHtml();
+  }
+  else if (b.dataset.more) { state.more = true; sync(true); }
+  else if (b.dataset.range) { state.range = b.dataset.range; state.more = false; save(); render(true); }
   else if (b.dataset.member) { state.member = b.dataset.member; state.timeline = null; drawer(); loadTimeline(state.member); }
-  else if (b.dataset.id) openThread(b.dataset.id);
-  else if (b.id === 'tab-board') { state.tab = 'board'; save(); render(); }
-  else if (b.id === 'tab-proj') { state.tab = 'proj'; save(); render(); }
-  else if (b.id === 'g0') { state.group = false; save(); render(); }
-  else if (b.id === 'g1') { state.group = true; save(); render(); }
-  else if (b.id === 'close' || b.id === 'scrim') { state.sel = null; state.member = null; drawer(); }
+  else if (b.dataset.id) openDrawer(b.dataset.id);
+  else if (b.dataset.status) {
+    // bấm số ở thanh đáy: chỉ xem trạng thái đó; bấm lần nữa để bỏ lọc
+    state.status = state.status === b.dataset.status ? 'all' : b.dataset.status;
+    state.more = false;
+    if (state.tab !== 'board') state.tab = 'board';
+    save();
+    render(true);
+  }
+  else if (b.id === 'tab-board') { state.tab = 'board'; save(); render(true); }
+  else if (b.id === 'tab-proj') { state.tab = 'proj'; save(); render(true); }
+  else if (b.id === 'theme') { state.theme = THEMES[(THEMES.findIndex((x) => x[0] === state.theme) + 1) % THEMES.length][0]; save(); applyTheme(); }
+  else if (b.id === 'dclose' || b.id === 'scrim') closeDrawer();
 });
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && state.sel) { state.sel = null; state.member = null; drawer(); } });
-$('#q').addEventListener('input', (e) => { state.q = e.target.value; render(); });
-render();
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && state.sel) closeDrawer(); });
+
+applyTheme();
+render(true);
 poll();
 setInterval(poll, POLL_MS);
