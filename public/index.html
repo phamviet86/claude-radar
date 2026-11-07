@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Thread Board</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Thread Board</h1>
+      <p class="sub">Các thread Claude Code trong Claude desktop, theo trạng thái và theo dự án.</p>
+    </div>
+    <div class="head-right">
+      <span class="count" id="upd" role="status"></span>
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" id="tab-board" aria-selected="true">Bảng</button>
+        <button class="tab" role="tab" id="tab-proj" aria-selected="false">Dự án</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="banner" id="banner" hidden></div>
+
+  <div class="bar" id="bar">
+    <div class="chips" id="chips" aria-label="Lọc theo thư mục"></div>
+    <input id="q" type="search" placeholder="Tìm theo tên thread" aria-label="Tìm theo tên thread">
+    <span class="spacer"></span>
+    <div class="seg" id="groupSeg" aria-label="Cách chia dòng">
+      <button id="g0" aria-pressed="true">Không chia</button>
+      <button id="g1" aria-pressed="false">Chia theo thư mục</button>
+    </div>
+    <span class="count" id="count"></span>
+  </div>
+
+  <main id="main"></main>
+  <p class="note">Cột Cần input và Hoàn thành dựa trên tóm tắt tự động của Claude sau mỗi lượt, nên đôi khi chưa chính xác. Cột Đang thực hiện lấy từ các tiến trình đang chạy. Trang này chỉ đọc: muốn trả lời, mở thread trong Claude desktop.</p>
+</div>
+
+<div class="scrim" id="scrim" hidden></div>
+<aside class="drawer" id="drawer" aria-label="Chi tiết thread"></aside>
+<script src="/app.js"></script>
+</body>
+</html>

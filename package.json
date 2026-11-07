@@ -1,0 +1,13 @@
+{
+  "name": "thread-board",
+  "version": "0.1.0",
+  "description": "Bảng Kanban chỉ đọc cho các thread Claude Code trong Claude desktop",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/"
+  }
+}
