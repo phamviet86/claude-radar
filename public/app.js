@@ -98,15 +98,15 @@ function cardHtml(g) {
     : '';
   // child threads sit right under the summary (listed one by one while the group is not done)
   const count = g.status === 'done' && ks.length ? `<span class="badge kc">+${ks.length} thread</span>` : '';
-  const pin = g.status !== 'input' && g.starred ? `<span class="pin">${ui('pin')}PINNED</span>` : '';
+  const pin = g.starred ? `<span class="flag" role="img" aria-label="Pinned" title="Pinned">${ui('pin')}</span>` : '';
   // needs input: the full "Open in Claude" button (opens the exact thread that is waiting); otherwise just an icon button. Both sit to the left of the time.
   const open = g.status === 'input'
     ? openLink(g.leadId, 'Open in Claude')
     : `<a class="open-sm" href="${esc(openUrl(g.id))}" aria-label="Open &quot;${esc(g.title)}&quot; in Claude"><span class="ot">Open in Claude</span>${ui('external-link')}</a>`;
   const run = g.status === 'work' && g.leadRun ? `<span class="runchip"><i class="led"></i>PID ${g.leadRun.pid}</span>` : '';
   const head = `<div class="chead"><span class="cs">${ui(STATUS_META[g.status].icon)}${{ input: 'NEEDS INPUT', work: 'RUNNING', done: 'DONE' }[g.status]}</span><span class="cid proj">${tagEl(g.path)}<span class="pn">${esc(g.folder)}</span></span></div>`;
-  return `${head}<button class="main" data-id="${esc(g.id)}"><span class="title">${esc(g.title)}</span>${lineHtml(g)}</button>${kids}
-    <div class="foot"><div class="fr-act">${open}${pin}${count}${run || `<time data-at="${g.activityAt}"></time>`}</div></div>`;
+  return `${pin}${head}<button class="main" data-id="${esc(g.id)}"><span class="title">${esc(g.title)}</span>${lineHtml(g)}</button>${kids}
+    <div class="foot"><div class="fr-act">${open}${count}${run || `<time data-at="${g.activityAt}"></time>`}</div></div>`;
 }
 
 const els = new Map();
@@ -204,6 +204,7 @@ function sync(quiet) {
     seen.add(g.id);
     let el = els.get(g.id), fresh = false;
     if (!el) { el = document.createElement('article'); el.className = 'card'; els.set(g.id, el); fresh = true; }
+    el.classList.toggle('starred', !!g.starred); // pinned threads: bookmark and a stronger tint
     const html = cardHtml(g), sig = `${g.status}|${html}`;
     if (el.dataset.sig !== sig) {
       const changed = el.dataset.s && el.dataset.s !== g.status;

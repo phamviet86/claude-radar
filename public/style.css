@@ -167,8 +167,6 @@ h1 { font: 600 13px var(--f-mono); letter-spacing: .14em; margin: 0; }
 .proj { display: inline-flex; gap: 7px; align-items: center; font-size: 12px; color: var(--muted); min-width: 0; }
 .proj .tg { width: 18px; height: 18px; border-radius: 0; }
 .proj .tg svg { width: 12px; height: 12px; }
-.pin { display: inline-flex; gap: 3px; align-items: center; font: 600 10px var(--f-mono); letter-spacing: .06em; color: var(--accent); background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); border-radius: 0; padding: 1px 6px 1px 4px; }
-.pin svg { width: 10px; height: 10px; }
 .badge { font: 500 10.5px var(--f-mono); color: var(--muted); background: var(--surface-2); border-radius: 0; padding: 1px 6px; }
 .runchip { display: inline-flex; gap: 6px; align-items: center; font: 500 10.5px var(--f-mono); color: var(--work); background: var(--work-bg); border: 1px solid color-mix(in srgb, var(--work) 30%, transparent); border-radius: 0; padding: 1px 7px; }
 .runchip .led { width: 5px; height: 5px; --c: var(--work); animation: led 1.6s ease-in-out infinite; }
@@ -279,8 +277,8 @@ h1 { font: 700 14px var(--f-display); letter-spacing: .26em; text-shadow: 0 0 14
   background:
     linear-gradient(var(--c), var(--c)) top left / 14px 2px no-repeat, linear-gradient(var(--c), var(--c)) top left / 2px 14px no-repeat,
     linear-gradient(var(--c), var(--c)) bottom right / 14px 2px no-repeat, linear-gradient(var(--c), var(--c)) bottom right / 2px 14px no-repeat,
-    linear-gradient(to bottom left, transparent calc(50% - .75px), color-mix(in srgb, var(--c) 75%, transparent) calc(50% - .75px) calc(50% + .75px), transparent calc(50% + .75px)) top right / var(--cut) var(--cut) no-repeat,
-    linear-gradient(to bottom left, transparent calc(50% - .75px), color-mix(in srgb, var(--c) 75%, transparent) calc(50% - .75px) calc(50% + .75px), transparent calc(50% + .75px)) bottom left / var(--cut) var(--cut) no-repeat,
+    linear-gradient(to bottom left, transparent calc(50% - var(--dw, .75px)), color-mix(in srgb, var(--c) 75%, transparent) calc(50% - var(--dw, .75px)) calc(50% + var(--dw, .75px)), transparent calc(50% + var(--dw, .75px))) top right / var(--cut) var(--cut) no-repeat,
+    linear-gradient(to bottom left, transparent calc(50% - var(--dw, .75px)), color-mix(in srgb, var(--c) 75%, transparent) calc(50% - var(--dw, .75px)) calc(50% + var(--dw, .75px)), transparent calc(50% + var(--dw, .75px))) bottom left / var(--cut) var(--cut) no-repeat,
     repeating-linear-gradient(0deg, var(--scan) 0 1px, transparent 1px 3px),
     linear-gradient(135deg, color-mix(in srgb, var(--c) var(--card-tint), transparent), transparent 62%),
     linear-gradient(180deg, var(--card-hi), var(--card));
@@ -308,9 +306,8 @@ h1 { font: 700 14px var(--f-display); letter-spacing: .26em; text-shadow: 0 0 14
 .st svg { filter: drop-shadow(0 0 6px color-mix(in srgb, var(--c) 80%, transparent)); }
 .card .proj .tg { border-color: color-mix(in srgb, var(--c) 35%, transparent); }
 .card .open-sm { border-color: transparent; }
-.kcount .badge, .badge, .pin, .runchip, .tool { border-color: color-mix(in srgb, var(--accent) 28%, var(--hair)); }
+.kcount .badge, .badge, .runchip, .tool { border-color: color-mix(in srgb, var(--accent) 28%, var(--hair)); }
 .runchip { box-shadow: 0 0 12px -5px var(--work); }
-.pin { box-shadow: 0 0 10px -4px var(--accent-glow); }
 /* open button of a needs-input card: glowing amber, one chamfered corner */
 .open { clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px)); font-family: var(--f-display); font-weight: 600; letter-spacing: .04em; padding: 5px 14px 5px 12px; box-shadow: none; filter: drop-shadow(0 0 8px var(--input-bar)); }
 .open:hover { filter: drop-shadow(0 0 14px var(--input-bar)) brightness(1.1); box-shadow: none; }
@@ -329,9 +326,8 @@ h1 { font: 700 14px var(--f-display); letter-spacing: .26em; text-shadow: 0 0 14
 @media (prefers-reduced-motion: reduce) { body::before, .brand-ic { animation: none; } .flow.boot .card { animation: none; } }
 
 /* chips on a card (PINNED, child threads, PID): one mold, with equal height, font size, border, padding and icon */
-.card .pin, .card .badge.kc, .card .runchip { box-sizing: border-box; display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; font: 600 10.5px/1 var(--f-mono); letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; border-width: 1px; border-style: solid; border-radius: 0; }
-.card .pin svg, .card .badge.kc svg, .card .runchip .led { width: 12px; height: 12px; flex: none; }
-.card .pin { color: var(--accent); background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 38%, transparent); }
+.card .badge.kc, .card .runchip { box-sizing: border-box; display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; font: 600 10.5px/1 var(--f-mono); letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; border-width: 1px; border-style: solid; border-radius: 0; }
+.card .badge.kc svg, .card .runchip .led { width: 12px; height: 12px; flex: none; }
 .card .badge.kc { color: var(--muted); background: color-mix(in srgb, var(--c) 12%, transparent); border-color: color-mix(in srgb, var(--c) 38%, transparent); }
 .card .runchip { color: var(--work); background: var(--work-bg); border-color: color-mix(in srgb, var(--work) 38%, transparent); }
 .card .runchip .led { width: 6px; height: 6px; }
@@ -468,12 +464,21 @@ h1 { font: 700 14px var(--f-display); letter-spacing: .26em; text-shadow: 0 0 14
 .card .open-sm:hover .ot, .card .open-sm:focus-visible .ot { max-width: 140px; opacity: 1; margin-right: 6px; }
 @media (prefers-reduced-motion: reduce) { .card .open-sm, .card .open-sm .ot { transition: none; } }
 
-/* while the secondary open button is open, the chips next to it (PINNED, +N THREAD) step aside instead of being pushed out of the card */
-.fr-act .pin, .fr-act .badge.kc { max-width: 220px; overflow: hidden; white-space: nowrap;
+/* while the secondary open button is open, the chip next to it (+N THREAD) steps aside instead of being pushed out of the card */
+.fr-act .badge.kc { max-width: 220px; overflow: hidden; white-space: nowrap;
   transition: max-width .3s var(--ease-out), opacity .2s, margin-left .3s var(--ease-out), padding .3s var(--ease-out), border-width .3s; }
-.fr-act:has(.open-sm:hover, .open-sm:focus-visible) :is(.pin, .badge.kc) { max-width: 0; opacity: 0; margin-left: -10px; padding-inline: 0; border-width: 0; pointer-events: none; }
-@media (prefers-reduced-motion: reduce) { .fr-act .pin, .fr-act .badge.kc { transition: none; } }
+.fr-act:has(.open-sm:hover, .open-sm:focus-visible) .badge.kc { max-width: 0; opacity: 0; margin-left: -10px; padding-inline: 0; border-width: 0; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .fr-act .badge.kc { transition: none; } }
 
 /* the open button in the drawer takes the status color of the card, like the board buttons do */
 .drawer .open { background: var(--c, var(--input-bar)); filter: drop-shadow(0 0 8px var(--c, var(--input-bar))); }
 .drawer .open:hover { filter: drop-shadow(0 0 14px var(--c, var(--input-bar))) brightness(1.1); }
+
+
+/* a pinned thread: a solid bookmark hangs from the top edge in the status color and takes the place of the status icon: the same
+   width and position (14px at 16px), so the gap to the label is the same too; the card is tinted more */
+.card .flag { position: absolute; top: 0; left: 16px; z-index: 1; width: 14px; height: 38px; padding-top: 15px; display: grid; justify-items: center; align-content: start;
+  background: var(--c); color: var(--on-bar); clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 85%, 0 100%); }
+.card .flag svg { width: 10px; height: 10px; }
+.card.starred { --card-tint: 34%; }
+.card.starred .chead .cs svg { visibility: hidden; }
