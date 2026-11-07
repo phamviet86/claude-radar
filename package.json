@@ -11,6 +11,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
+    "demo": "node demo/run.mjs",
+    "screenshots": "electron demo/screenshots.mjs",
     "test": "node --test test/",
     "check": "tsc",
     "app": "electron .",
