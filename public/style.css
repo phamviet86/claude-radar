@@ -504,7 +504,7 @@ body { padding-bottom: 62px; }
 /* right: name | bar | figure; the "low" flag sits inside the figure cell, so no empty column is reserved */
 .qright { justify-self: end; }
 .qsvc { display: grid; grid-template-columns: 76px minmax(60px, 190px) auto; justify-content: start; align-items: center; gap: 12px; }
-.qval { display: inline-flex; align-items: baseline; gap: 8px; white-space: nowrap; }
+.qval { display: inline-flex; align-items: baseline; gap: 8px; white-space: nowrap; min-width: 84px; }
 .qbar { display: block; height: 6px; background: var(--well); border: 1px solid var(--line); }
 .qbar i { display: block; height: 100%; background: var(--done); }
 .qsvc[data-low="true"] .qbar i { background: var(--input-bar); }
@@ -519,5 +519,8 @@ body { padding-bottom: 62px; }
   .qleft { grid-template-columns: 76px 1fr; column-gap: 12px; padding: 0 0 7px; border-right: 0; border-bottom: 1px solid var(--line); }
   .qrows.qinline { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 18px; }
   .qleft .qplan { grid-template-columns: 22px minmax(40px, 1fr) 38px auto; }
-  .qright { justify-self: start; }
+  /* stacked: every row spans the full width. The bar takes what is left; the figure column has one width in all rows, so the bars end in line */
+  .qright { justify-self: stretch; }
+  .qsvc { grid-template-columns: 76px minmax(40px, 1fr) 84px; justify-content: stretch; }
+  .qrows.qinline { justify-content: space-between; }
 }
