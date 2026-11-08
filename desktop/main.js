@@ -23,6 +23,16 @@ if (existsSync(join(appData, 'thread-board')) && !existsSync(join(appData, 'clau
   }
 }
 
+// opt-in quotas: FIRECRAWL_API_KEY may live in a .env next to the source (npm run app) or in the app's settings folder (built .app);
+// a variable already set in the environment wins (loadEnvFile never overrides it)
+for (const f of [join(dir, '..', '.env'), join(appData, 'claude-radar', '.env')]) {
+  try {
+    if (existsSync(f)) process.loadEnvFile(f);
+  } catch {
+    /* expected: unreadable file, the quotas card stays "Chưa bật" */
+  }
+}
+
 if (!app.requestSingleInstanceLock()) app.quit();
 app.on('second-instance', () => showWindow());
 

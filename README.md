@@ -124,10 +124,10 @@ A collapsed **QUOTAS** panel under the top bar (it shows "Chưa bật" until a k
 Docs checked 2026-11-08 (Firecrawl API reference; Crawl4AI docs; Perplexity docs and community).
 
 ```bash
-FIRECRAWL_API_KEY=fc-... npm start     # or: FIRECRAWL_API_KEY=fc-... npm run app
+FIRECRAWL_API_KEY=fc-... npm start     # or put the line in a gitignored .env (see .env.example): npm start / npm run dev / npm run app load it
 ```
 
-A built `.app` opened from Finder does not see your shell variables; start it from a terminal instead: `FIRECRAWL_API_KEY=fc-... "/Applications/Claude Radar.app/Contents/MacOS/Claude Radar"`.
+A built `.app` opened from Finder does not see your shell variables: put the same line in `~/Library/Application Support/claude-radar/.env`, or start it from a terminal instead: `FIRECRAWL_API_KEY=fc-... "/Applications/Claude Radar.app/Contents/MacOS/Claude Radar"`.
 
 - **Low warning:** for a provider with a known limit (Firecrawl), under 20% remaining shows the text "sắp hết" on its card and a **SẮP HẾT** light in the top bar. The menu-bar icon is unchanged.
 - **What leaves your machine:** only the Firecrawl request (your key as a Bearer header, to `api.firecrawl.dev` over HTTPS, 8 s timeout, `GET`, no redirects). The key is read from the environment on the server, never logged, never sent to the page, never written to disk, and errors show fixed phrases only.
