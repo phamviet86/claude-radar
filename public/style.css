@@ -502,9 +502,9 @@ body { padding-bottom: 62px; }
 .qleft .qplan .qv { text-align: right; }
 .qplan[data-high="true"] .qbar i { background: var(--input-bar); }
 /* right: name | bar | figure; the "low" flag sits inside the figure cell, so no empty column is reserved */
-.qright { justify-self: end; }
-.qsvc { display: grid; grid-template-columns: 76px minmax(60px, 190px) auto; justify-content: start; align-items: center; gap: 12px; }
-.qval { display: inline-flex; align-items: baseline; gap: 8px; white-space: nowrap; min-width: 84px; }
+.qright { justify-self: end; grid-template-columns: 76px minmax(60px, 190px) max-content; column-gap: 12px; }
+.qsvc { display: grid; grid-template-columns: subgrid; grid-column: 1 / -1; align-items: center; } /* subgrid: all rows share the same columns, so the bars end in line and the figures sit flush right with no spare gap */
+.qval { display: inline-flex; align-items: center; justify-content: flex-end; gap: 8px; white-space: nowrap; }
 .qbar { display: block; height: 6px; background: var(--well); border: 1px solid var(--line); }
 .qbar i { display: block; height: 100%; background: var(--done); }
 .qsvc[data-low="true"] .qbar i { background: var(--input-bar); }
@@ -521,6 +521,9 @@ body { padding-bottom: 62px; }
   .qleft .qplan { grid-template-columns: 22px minmax(40px, 1fr) 38px auto; }
   /* stacked: every row spans the full width. The bar takes what is left; the figure column has one width in all rows, so the bars end in line */
   .qright { justify-self: stretch; }
-  .qsvc { grid-template-columns: 76px minmax(40px, 1fr) 84px; justify-content: stretch; }
-  .qrows.qinline { justify-content: space-between; }
+  .qright { grid-template-columns: 76px minmax(40px, 1fr) max-content; }
+  /* Claude is ONE line when stacked: title, 5H and 7D spread evenly across the full width (never wraps to two lines) */
+  .qleft:has(.qinline) { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .qleft:has(.qinline) .qrows { display: contents; }
+  .qleft:has(.qinline) .qrow { flex: none; }
 }
