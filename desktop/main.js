@@ -15,6 +15,7 @@ let win = null;
 let keysWin = null;
 let tray = null;
 let base = '';
+const KEYS_URL = 'claude-radar://keys';
 let quitting = false;
 
 // the app used to be called Thread Board: carry its settings folder (the saved filters) over to the new name
@@ -33,7 +34,7 @@ for (const f of [join(dir, '..', '.env'), join(appData, 'claude-radar', '.env')]
   try {
     if (existsSync(f)) process.loadEnvFile(f);
   } catch {
-    /* expected: unreadable file, the quotas card stays "Chưa bật" */
+    /* expected: unreadable file, the quotas card stays "Off" */
   }
 }
 
@@ -80,20 +81,26 @@ function showKeys() {
   keysWin.on('closed', () => { keysWin = null; });
 }
 
+// tell the board window a key changed, so the footer refreshes now instead of at its next poll
+function keysChanged() {
+  quotas.reset();
+  win?.webContents.executeJavaScript("window.dispatchEvent(new Event('claude-radar:keys'))").catch(() => {});
+}
+
 // only the API keys window may talk to the key store, and it can never read a key back
 const fromKeysWindow = (e) => keysWin && e.sender === keysWin.webContents;
 ipcMain.handle('keys:status', (e) => { if (!fromKeysWindow(e)) throw new Error('Not allowed.'); return keyStore.status(); });
 ipcMain.handle('keys:save', (e, name, value) => {
   if (!fromKeysWindow(e)) throw new Error('Not allowed.');
   process.env[name] = keyStore.set(name, value);
-  quotas.reset();
+  keysChanged();
   return keyStore.status();
 });
 ipcMain.handle('keys:clear', (e, name) => {
   if (!fromKeysWindow(e)) throw new Error('Not allowed.');
   keyStore.remove(name);
   if (envBefore[name] === undefined) delete process.env[name]; else process.env[name] = envBefore[name]; // back to .env / the environment
-  quotas.reset();
+  keysChanged();
   return keyStore.status();
 });
 
@@ -120,8 +127,14 @@ function createWindow() {
   win.loadURL(base);
   // claude://... and external links open outside the app; the window never leaves the local server
   const external = (url) => !url.startsWith(base);
-  win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
-  win.webContents.on('will-navigate', (e, url) => { if (external(url)) { e.preventDefault(); shell.openExternal(url); } });
+  // the footer's "ENABLE" button asks for the API keys window with window.open('claude-radar://keys')
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (url === KEYS_URL) showKeys(); else shell.openExternal(url);
+    return { action: 'deny' };
+  });
+  win.webContents.on('will-navigate', (e, url) => {
+    if (url === KEYS_URL) { e.preventDefault(); showKeys(); } else if (external(url)) { e.preventDefault(); shell.openExternal(url); }
+  });
   win.on('close', (e) => { if (!quitting) { e.preventDefault(); win.hide(); } });
 }
 

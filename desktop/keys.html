@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="vi">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
@@ -24,10 +24,10 @@
 </head>
 <body>
 <h1>API KEYS</h1>
-<p class="sub">Bật thẻ Firecrawl và Crawl4AI trong footer. Key được mã hóa bằng Keychain của macOS, chỉ máy chủ trong app đọc, không hiện lại ở đây.</p>
+<p class="sub">Turns on the Firecrawl and Crawl4AI cards in the footer. Keys are encrypted with the macOS Keychain, read only by the app's built-in server, and never shown here again.</p>
 <div id="rows"></div>
 <div id="msg" role="status"></div>
-<small>Key chỉ được gửi tới đúng máy chủ của nhà cung cấp (api.firecrawl.dev, api.crawl4ai.com) để đọc số dư.</small>
+<small>A key is sent only to the provider's own server (api.firecrawl.dev, api.crawl4ai.com) to read the balance.</small>
 <script>
 const NAMES = [['FIRECRAWL_API_KEY', 'Firecrawl'], ['CRAWL4AI_API_KEY', 'Crawl4AI Cloud']];
 const rows = document.getElementById('rows');
@@ -42,17 +42,17 @@ for (const [name, label] of NAMES) {
   top.append(b, st);
   const line = document.createElement('div'); line.className = 'line';
   const input = document.createElement('input'); input.type = 'password'; input.autocomplete = 'off'; input.spellcheck = false; input.placeholder = name;
-  const save = document.createElement('button'); save.textContent = 'LƯU';
-  const clear = document.createElement('button'); clear.textContent = 'XÓA'; clear.className = 'ghost';
+  const save = document.createElement('button'); save.textContent = 'SAVE';
+  const clear = document.createElement('button'); clear.textContent = 'CLEAR'; clear.className = 'ghost';
   line.append(input, save, clear);
   row.append(top, line); rows.append(row);
   els[name] = { st, input, clear };
   save.addEventListener('click', async () => {
-    try { render(await window.keys.save(name, input.value)); input.value = ''; say(`Đã lưu key ${label}.`); }
+    try { render(await window.keys.save(name, input.value)); input.value = ''; say(`Saved the ${label} key.`); }
     catch (e) { say(String(e.message || e).replace(/^Error invoking remote method '[^']*': (Error: )?/, ''), true); }
   });
   clear.addEventListener('click', async () => {
-    try { render(await window.keys.clear(name)); input.value = ''; say(`Đã xóa key ${label}.`); }
+    try { render(await window.keys.clear(name)); input.value = ''; say(`Cleared the ${label} key.`); }
     catch (e) { say(String(e.message || e), true); }
   });
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter') save.click(); });
@@ -60,7 +60,7 @@ for (const [name, label] of NAMES) {
 function render(s) {
   for (const [name] of NAMES) {
     const on = Boolean(s[name]);
-    els[name].st.textContent = on ? 'ĐÃ LƯU' : 'CHƯA CÓ';
+    els[name].st.textContent = on ? 'SAVED' : 'NOT SET';
     els[name].st.dataset.on = String(on);
     els[name].clear.disabled = !on;
   }
