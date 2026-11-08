@@ -3,6 +3,7 @@
 // folder of your choice, so the board runs without Claude desktop and shows nothing of your own work.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { QuotaService } from '../lib/quotas.js';
 
 const MIN = 60_000;
 const ROOT = '/Users/demo/Repo';
@@ -141,4 +142,17 @@ export function writeDemo(dir, now = Date.now(), pid = process.pid) {
     writeFileSync(join(dirOfProject, `${cliId}.jsonl`), lines.map((l) => JSON.stringify(l)).join('\n') + '\n');
   });
   return { desktopDir: desktopRoot, registryDir, projectsDir };
+}
+
+/**
+ * Made-up quotas for the demo and the screenshots: a fake key, a fake fetch and fixed token numbers.
+ * The demo never reads your environment and never touches the network, whatever keys you have set.
+ */
+export function demoQuotas() {
+  const body = { success: true, data: { remainingCredits: 130, planCredits: 1000, billingPeriodStart: '2026-11-01T00:00:00Z', billingPeriodEnd: '2026-12-01T00:00:00Z' } };
+  return new QuotaService({
+    env: { FIRECRAWL_API_KEY: 'demo-not-a-key' },
+    fetch: /** @type {any} */ (async () => new Response(JSON.stringify(body), { status: 200 })),
+    claude: { estimate: () => ({ fiveHour: 412_000, week: 6_850_000, warnings: [] }) },
+  });
 }

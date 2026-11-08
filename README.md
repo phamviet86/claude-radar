@@ -16,7 +16,7 @@ All pictures in this README use **made-up data** (see [Try it without Claude des
 npm start        # http://127.0.0.1:4848  (change the port: PORT=5000 npm start)
 ```
 
-Requires Node 22 or later. The server listens on `127.0.0.1` only and rejects other Host headers, so thread titles and summaries never leave your machine.
+Requires Node 22 or later. The server listens on `127.0.0.1` only and rejects other Host headers, so thread titles and summaries never leave your machine. By default the server makes **no outbound network calls and reads no API keys**; the one exception is the opt-in [Quotas panel](#quotas-opt-in).
 
 ### Try it without Claude desktop
 
@@ -110,13 +110,37 @@ Then drag `Claude Radar.app` from `dist/` into Applications and open it. The bui
 
 **Troubleshooting.** If macOS asks whether Claude Radar may access data from other apps, allow it: it reads Claude desktop's thread files. If the menu-bar counts show `×`, the built-in server could not be reached; quit and reopen the app.
 
+## Quotas (opt-in)
+
+A collapsed **QUOTAS** panel under the top bar (it shows "Chưa bật" until a key is set). It is the only part of Claude Radar that can make an outbound call, and only when you set a key.
+
+| Provider | What it shows | Needs |
+| --- | --- | --- |
+| Claude | **ƯỚC TÍNH** (estimate): tokens used in the last 5 hours and last 7 days, summed from your local transcripts (input + output + cache creation; rolling windows, not your plan's reset times). No percentage: the plan limits are only on claude.ai, linked from the card. | nothing (local files, no network) |
+| Firecrawl | credits remaining of the plan and the billing period end, from `GET https://api.firecrawl.dev/v2/team/credit-usage` | `FIRECRAWL_API_KEY` |
+| Crawl4AI Cloud | **không khả dụng**: its docs list no REST balance endpoint (only the OAuth MCP `balance` tool) | - |
+| Perplexity | **không khả dụng**: no balance API; the card links to the billing page of the console | - |
+
+Docs checked 2026-11-08 (Firecrawl API reference; Crawl4AI docs; Perplexity docs and community).
+
+```bash
+FIRECRAWL_API_KEY=fc-... npm start     # or: FIRECRAWL_API_KEY=fc-... npm run app
+```
+
+A built `.app` opened from Finder does not see your shell variables; start it from a terminal instead: `FIRECRAWL_API_KEY=fc-... "/Applications/Claude Radar.app/Contents/MacOS/Claude Radar"`.
+
+- **Low warning:** for a provider with a known limit (Firecrawl), under 20% remaining shows the text "sắp hết" on its card and a **SẮP HẾT** light in the top bar. The menu-bar icon is unchanged.
+- **What leaves your machine:** only the Firecrawl request (your key as a Bearer header, to `api.firecrawl.dev` over HTTPS, 8 s timeout, `GET`, no redirects). The key is read from the environment on the server, never logged, never sent to the page, never written to disk, and errors show fixed phrases only.
+- **No traffic from the page refresh:** the server caches each external answer for **5 minutes** (errors too, no retries); the page asks `/api/quotas` every 15 s and only gets the cached answer. No endpoint that changes spending is ever called.
+- `npm run demo` and `npm run screenshots` use a fake key and a fake `fetch` whatever your environment holds; tests use mocks only.
+
 ## Known limits
 
 - "Needs input" and "Done" rely on a summary Claude writes itself after each turn, so they are sometimes wrong.
 - This is Claude's internal format and may change between versions. When it cannot be read, the page shows a warning instead of failing.
 - Only threads on this machine are visible (no SSH or cloud sessions). Multiple Claude configurations are not supported (`CLAUDE_CONFIG_DIR` takes a single directory).
 - Claude's summaries are sometimes truncated or out of step with the last message; the latest message can be long or just "Done.".
-- The board does not show plan usage (the 5-hour and weekly limits) or token counts.
+- The board does not show your plan's own usage bars (the 5-hour and weekly limits): Claude has no public endpoint for them. The [Quotas panel](#quotas-opt-in) shows only a local token *estimate*.
 
 ## Environment variables
 
@@ -125,6 +149,7 @@ Then drag `Claude Radar.app` from `dist/` into Applications and open it. The bui
 | `PORT` | Port (default 4848; 4868 for `npm run demo`) |
 | `CLAUDE_RADAR_DESKTOP` | Claude desktop's thread directory; `off` to disable |
 | `CLAUDE_CONFIG_DIR` | Claude Code config directory (default `~/.claude`) |
+| `FIRECRAWL_API_KEY` | Opt-in: turns on the Firecrawl credits card (see [Quotas](#quotas-opt-in)) |
 
 ## Project layout
 
@@ -134,6 +159,7 @@ Then drag `Claude Radar.app` from `dist/` into Applications and open it. The bui
 | `lib/model.js` | Pure board model: status of each thread, grouping, day buckets |
 | `lib/read.js` | Reads Claude's files from disk, with caching and warnings |
 | `lib/timeline.js` | Turns a conversation transcript into the work list and the latest message |
+| `lib/quotas.js`, `lib/usage.js` | The opt-in Quotas panel: Firecrawl credits (cached call) and the local Claude token estimate |
 | `public/` | The page: `index.html`, `app.js`, `style.css`, bundled fonts and icons |
 | `desktop/` | The Electron wrapper (menu bar icon, window) and the icon scripts |
 | `demo/` | Made-up data, `npm run demo` and the screenshot script |

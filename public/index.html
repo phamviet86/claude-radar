@@ -17,6 +17,7 @@
     </div>
     <div class="sync" role="status" aria-label="Connection status">
       <span class="sb-item" id="sb-link"><i class="led live" id="sb-led"></i><b id="sb-state">CONNECTING</b></span>
+      <span class="sb-item" id="sb-quota" hidden title="A quota is running low (see QUOTAS)"><i class="led" style="--c: var(--input)"></i><b>SẮP HẾT</b></span>
       <span class="sb-item"><span class="sb-k">SYNC</span><span id="stamp" title="Refreshes every 2 seconds">--:--:--</span></span>
     </div>
   </div>
@@ -27,6 +28,7 @@
 
 <div class="wrap">
   <div class="banner" id="banner" hidden></div>
+  <section class="quotas" id="quotas" aria-label="Quotas" hidden></section>
 
   <div class="bar"><div class="chips" id="chips" aria-label="Filter by project"></div><div class="seg" id="range" role="group" aria-label="Time range for finished threads"></div></div>
 
@@ -41,5 +43,6 @@
 <aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-label="Thread details" tabindex="-1"></aside>
 <script src="/icons.js"></script>
 <script src="/app.js"></script>
+<script src="/quotas.js"></script>
 </body>
 </html>
