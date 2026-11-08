@@ -1,12 +1,12 @@
-// Quotas panel (opt-in). Fetches /api/quotas, which the server answers from its own cache, so polling here
+// Quotas footer (opt-in). Fetches /api/quotas, which the server answers from its own cache, so polling here
 // never reaches the vendors. All text goes through textContent: nothing from the server is ever parsed as HTML.
+// Left: Claude tokens (a local estimate, no plan limit known, so numbers only). Right: a used/total bar for each
+// service that reports one (Firecrawl, Crawl4AI).
 (() => {
   const POLL_MS = 15000;
   const host = document.getElementById('quotas');
   const dot = document.getElementById('sb-quota');
   if (!host || !dot) return;
-  let open = false;
-  try { open = localStorage.getItem('claude-radar-quotas') === 'open'; } catch { /* no localStorage: collapsed */ }
 
   const el = (tag, cls, text) => {
     const e = document.createElement(tag);
@@ -15,56 +15,52 @@
     return e;
   };
   const fmt = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}k` : String(Math.round(n)));
-  const STATE = { ok: 'OK', estimate: 'ƯỚC TÍNH', 'needs-key': 'CHƯA BẬT', unavailable: 'KHÔNG KHẢ DỤNG', error: 'LỖI' };
 
-  function card(p) {
-    const c = el('div', 'qcard');
-    c.dataset.state = p.state;
-    if (p.low) c.dataset.low = 'true';
-    const head = el('div', 'qhead');
-    head.append(el('b', '', p.label), el('span', 'qstate', STATE[p.state] || p.state));
-    if (p.low) head.append(el('span', 'qlow', 'sắp hết'));
-    c.append(head);
-    if (p.state === 'ok' && p.limit !== undefined) {
-      c.append(el('div', 'qnum', `${fmt(p.remaining)} / ${fmt(p.limit)} ${p.unit} còn lại`));
-      if (p.limit > 0) {
-        const bar = el('div', 'qbar');
-        const fill = el('i');
-        fill.style.width = `${Math.max(0, Math.min(100, (p.remaining / p.limit) * 100))}%`;
-        bar.append(fill);
-        c.append(bar);
-      }
-      if (p.periodEnd) c.append(el('div', 'qnote', `Kỳ thanh toán đến ${new Date(p.periodEnd).toLocaleDateString('en-GB')}`));
+  function claude(p) {
+    const g = el('div', 'qgroup');
+    const item = el('span', 'qitem');
+    item.title = p.note || '';
+    item.append(el('span', 'qk', 'CLAUDE · ƯỚC TÍNH'));
+    g.append(item);
+    for (const w of p.windows || []) {
+      const i = el('span', 'qitem');
+      i.title = `${w.label}: ${Math.round(w.used).toLocaleString('en-US')} ${p.unit} đã dùng`;
+      i.append(el('span', 'qk', w.label.includes('5') ? '5H' : '7D'), el('b', '', fmt(w.used)), el('span', 'qk', 'tokens'));
+      g.append(i);
     }
-    for (const r of p.rows || []) c.append(el('div', 'qnum', `${r.label}: ${r.value} ${p.unit}`));
-    for (const w of p.windows || []) c.append(el('div', 'qnum', `${w.label}: ${fmt(w.used)} ${p.unit} đã dùng`));
-    if (p.state === 'needs-key') c.append(el('div', 'qnote', `Đặt biến môi trường ${p.env} rồi khởi động lại.`));
-    else if (p.note) c.append(el('div', 'qnote', p.note));
-    if (p.link) {
-      const a = el('a', 'qlink', 'Mở trang chính thức');
-      a.href = p.link; a.target = '_blank'; a.rel = 'noopener noreferrer';
-      c.append(a);
+    return g;
+  }
+
+  function service(p) {
+    const i = el('span', 'qitem');
+    i.dataset.state = p.state;
+    if (p.low) i.dataset.low = 'true';
+    i.append(el('span', 'qk', p.label.toUpperCase().replace(' CLOUD', '')));
+    if (p.state === 'ok' && p.limit > 0) {
+      const bar = el('span', 'qbar');
+      const fill = el('i');
+      fill.style.width = `${Math.max(0, Math.min(100, (p.used / p.limit) * 100))}%`;
+      bar.append(fill);
+      i.append(bar, el('b', '', `${fmt(p.used)} / ${fmt(p.limit)}`));
+      if (p.low) i.append(el('span', 'qlow', 'sắp hết'));
+      i.title = `${p.label}: ${p.used.toLocaleString('en-US')} đã dùng / ${p.limit.toLocaleString('en-US')} ${p.unit}${p.periodEnd ? ` · đến ${new Date(p.periodEnd).toLocaleDateString('en-GB')}` : ''}`;
+    } else if (p.state === 'needs-key') {
+      i.append(el('span', 'qoff', 'Chưa bật'));
+      i.title = `Đặt biến môi trường ${p.env} rồi khởi động lại.`;
+    } else {
+      i.append(el('span', 'qoff', p.state === 'error' ? 'lỗi' : 'không khả dụng'));
+      i.title = p.note || '';
     }
-    return c;
+    return i;
   }
 
   function draw(data) {
     host.replaceChildren();
-    const toggle = el('button', 'qtoggle');
-    toggle.type = 'button';
-    toggle.setAttribute('aria-expanded', String(open));
-    toggle.append(el('span', '', 'QUOTAS'), el('span', 'qsum', data.enabled ? (data.low ? 'sắp hết' : 'đã bật') : 'Chưa bật'));
-    toggle.addEventListener('click', () => {
-      open = !open;
-      try { localStorage.setItem('claude-radar-quotas', open ? 'open' : 'closed'); } catch { /* ignore */ }
-      draw(data);
-    });
-    host.append(toggle);
-    if (open) {
-      const grid = el('div', 'qgrid');
-      for (const p of data.providers) grid.append(card(p));
-      host.append(grid);
-    }
+    const left = data.providers.find((p) => p.id === 'claude');
+    const right = el('div', 'qgroup');
+    for (const p of data.providers) if (p.id === 'firecrawl' || p.id === 'crawl4ai') right.append(service(p));
+    if (left) host.append(claude(left));
+    host.append(right);
     dot.hidden = !data.low;
     host.hidden = false;
   }
@@ -73,7 +69,7 @@
     try {
       const res = await fetch('/api/quotas', { cache: 'no-store' });
       if (res.ok) draw(await res.json());
-    } catch { /* keep the last panel; the board has its own connection light */ }
+    } catch { /* keep the last footer; the board has its own connection light */ }
   }
   (async function loop() { await poll(); setTimeout(loop, POLL_MS); })();
 })();

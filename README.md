@@ -112,13 +112,13 @@ Then drag `Claude Radar.app` from `dist/` into Applications and open it. The bui
 
 ## Quotas (opt-in)
 
-A collapsed **QUOTAS** panel under the top bar (it shows "Chưa bật" until a key is set). It is the only part of Claude Radar that can make an outbound call, and only when you set a key.
+A thin **footer** at the bottom of the page. Left: the Claude token estimate for the last 5 hours and 7 days (numbers only: no plan limit is known). Right: a used / total bar for Firecrawl and Crawl4AI. A service without a key shows "Chưa bật" (hover for the variable to set); hover any item for the exact figures. It is the only part of Claude Radar that can make an outbound call, and only when you set a key.
 
 | Provider | What it shows | Needs |
 | --- | --- | --- |
 | Claude | **ƯỚC TÍNH** (estimate): tokens used in the last 5 hours and last 7 days, summed from your local transcripts (input + output + cache creation; rolling windows, not your plan's reset times). No percentage: the plan limits are only on claude.ai, linked from the card. | nothing (local files, no network) |
-| Firecrawl | credits remaining of the plan and the billing period end, from `GET https://api.firecrawl.dev/v2/team/credit-usage` | `FIRECRAWL_API_KEY` |
-| Crawl4AI Cloud | free credits, bought credits and spend this month, from `GET https://api.crawl4ai.com/v1/billing/balance` (read-only; found in the console's API reference, not on the public docs page). No limit is shown, so no "sắp hết" flag. | `CRAWL4AI_API_KEY` |
+| Firecrawl | credits used of the plan (bar) and the billing period end (hover), from `GET https://api.firecrawl.dev/v2/team/credit-usage` | `FIRECRAWL_API_KEY` |
+| Crawl4AI Cloud | spent this month over what the month offered (spent + free left + bought left; the API states no plan limit, so this total is derived), from `GET https://api.crawl4ai.com/v1/billing/balance` (read-only; found in the console's API reference, not on the public docs page). No "sắp hết" flag, since there is no known limit. | `CRAWL4AI_API_KEY` |
 | Perplexity | **không khả dụng** (checked 2026-11-08): no balance API; the card links to the billing page of the console | - |
 
 Checked 2026-11-08 against the Firecrawl API reference, the Crawl4AI console API reference and the Perplexity docs.
@@ -129,7 +129,7 @@ FIRECRAWL_API_KEY=fc-... CRAWL4AI_API_KEY=sk_live_... npm start     # or put the
 
 A built `.app` opened from Finder does not see your shell variables: put the same line in `~/Library/Application Support/claude-radar/.env`, or start it from a terminal instead: `FIRECRAWL_API_KEY=fc-... "/Applications/Claude Radar.app/Contents/MacOS/Claude Radar"`.
 
-- **Low warning:** for a provider with a known limit (Firecrawl), under 20% remaining shows the text "sắp hết" on its card and a **SẮP HẾT** light in the top bar. The menu-bar icon is unchanged.
+- **Low warning:** for a provider with a known limit (Firecrawl), under 20% remaining shows the text "sắp hết" next to its bar and a **SẮP HẾT** light in the top bar. The menu-bar icon is unchanged.
 - **What leaves your machine:** only the Firecrawl and Crawl4AI balance requests (your key as a Bearer header, to `api.firecrawl.dev` / `api.crawl4ai.com` over HTTPS, 8 s timeout, `GET`, no redirects). The key is read from the environment on the server, never logged, never sent to the page, never written to disk, and errors show fixed phrases only.
 - **No traffic from the page refresh:** the server caches each external answer for **5 minutes** (errors too, no retries); the page asks `/api/quotas` every 15 s and only gets the cached answer. No endpoint that changes spending is ever called (Crawl4AI's `/v1/billing/topup`, `/subscribe` and `/settings` are never touched).
 - `npm run demo` and `npm run screenshots` use a fake key and a fake `fetch` whatever your environment holds; tests use mocks only.

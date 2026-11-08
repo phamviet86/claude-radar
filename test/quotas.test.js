@@ -171,6 +171,7 @@ test('crawl4ai: GET balance only, mc converted to credits, no low flag, no other
   const c = out.providers[2];
   assert.deepEqual(c.rows, [{ label: 'Free credits (2026-11)', value: '1,000' }, { label: 'Bought credits', value: '5' }, { label: 'Spent this month', value: '1.5' }]);
   assert.equal(c.remaining, 1005);
+  assert.deepEqual([c.used, c.limit], [1.5, 1006.5]); // bar: spent / (spent + free left + bought left)
   assert.equal(c.low, undefined);
   assert.equal(out.enabled, true);
   assert.equal(out.providers[1].state, 'needs-key');
