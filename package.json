@@ -34,6 +34,9 @@
       "lib/**",
       "public/**",
       "desktop/main.js",
+      "desktop/keystore.js",
+      "desktop/keys.html",
+      "desktop/preload.cjs",
       "desktop/*.png",
       "package.json"
     ],

@@ -1,14 +1,18 @@
 // Claude Radar as a Mac app: runs the local read-only server inside the app and shows the board window.
 // Closing the window only hides it; the menu-bar icon shows INPUT and RUN and reopens the window on click.
-import { app, BrowserWindow, Menu, Tray, nativeImage, shell } from 'electron';
+import { app, BrowserWindow, Menu, Tray, ipcMain, nativeImage, safeStorage, shell } from 'electron';
 import { existsSync, renameSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { createBoardServer } from '../server.js';
+import { SessionReader } from '../lib/read.js';
+import { QuotaService } from '../lib/quotas.js';
+import { KeyStore, KEY_NAMES } from './keystore.js';
 
 const dir = fileURLToPath(new URL('.', import.meta.url));
 const PORT = Number(process.env.PORT) || 4858; // fixed port: localStorage (saved filters) is tied to the origin
 let win = null;
+let keysWin = null;
 let tray = null;
 let base = '';
 let quitting = false;
@@ -33,11 +37,17 @@ for (const f of [join(dir, '..', '.env'), join(appData, 'claude-radar', '.env')]
   }
 }
 
+// keys entered in the app (Quotas > API keys...) are stored encrypted (Keychain) and override .env / the environment while saved
+const envBefore = Object.fromEntries(KEY_NAMES.map((n) => [n, process.env[n]]));
+const keyStore = new KeyStore({ file: join(appData, 'claude-radar', 'keys.json'), safeStorage });
+const reader = new SessionReader();
+const quotas = new QuotaService({ projectsDir: reader.projectsDir });
+
 if (!app.requestSingleInstanceLock()) app.quit();
 app.on('second-instance', () => showWindow());
 
 function listen() {
-  const server = createBoardServer();
+  const server = createBoardServer(reader, Date.now, quotas);
   return new Promise((resolve, reject) => {
     const attempt = (port) => {
       server.once('error', (e) => (e.code === 'EADDRINUSE' && port !== 0 ? attempt(0) : reject(e)));
@@ -46,6 +56,46 @@ function listen() {
     attempt(PORT);
   });
 }
+
+function applyStoredKeys() {
+  try {
+    for (const [name, value] of Object.entries(keyStore.load())) process.env[name] = value;
+  } catch {
+    /* expected: Keychain unavailable; the quotas cards stay as the environment says */
+  }
+  quotas.reset();
+}
+
+function showKeys() {
+  if (keysWin) { keysWin.show(); keysWin.focus(); return; }
+  keysWin = new BrowserWindow({
+    width: 480, height: 400, resizable: false, minimizable: false, maximizable: false, title: 'API keys', backgroundColor: '#040a14',
+    webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, preload: join(dir, 'preload.cjs') },
+  });
+  keysWin.setMenuBarVisibility(false);
+  keysWin.loadFile(join(dir, 'keys.html'));
+  // this window never navigates or opens anything else
+  keysWin.webContents.on('will-navigate', (e) => e.preventDefault());
+  keysWin.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  keysWin.on('closed', () => { keysWin = null; });
+}
+
+// only the API keys window may talk to the key store, and it can never read a key back
+const fromKeysWindow = (e) => keysWin && e.sender === keysWin.webContents;
+ipcMain.handle('keys:status', (e) => { if (!fromKeysWindow(e)) throw new Error('Not allowed.'); return keyStore.status(); });
+ipcMain.handle('keys:save', (e, name, value) => {
+  if (!fromKeysWindow(e)) throw new Error('Not allowed.');
+  process.env[name] = keyStore.set(name, value);
+  quotas.reset();
+  return keyStore.status();
+});
+ipcMain.handle('keys:clear', (e, name) => {
+  if (!fromKeysWindow(e)) throw new Error('Not allowed.');
+  keyStore.remove(name);
+  if (envBefore[name] === undefined) delete process.env[name]; else process.env[name] = envBefore[name]; // back to .env / the environment
+  quotas.reset();
+  return keyStore.status();
+});
 
 function showWindow() {
   if (!win) return createWindow();
@@ -92,6 +142,7 @@ function buildMenu() {
   return Menu.buildFromTemplate([
     { label: 'Show Claude Radar', click: showWindow },
     { type: 'separator' },
+    { label: 'API keys…', click: showKeys },
     { label: 'Launch at login', type: 'checkbox', checked: app.getLoginItemSettings().openAtLogin, click: (i) => app.setLoginItemSettings({ openAtLogin: i.checked }) },
     { type: 'separator' },
     { label: 'Quit', accelerator: 'Cmd+Q', click: () => { quitting = true; app.quit(); } },
@@ -99,6 +150,7 @@ function buildMenu() {
 }
 
 app.whenReady().then(async () => {
+  applyStoredKeys();
   base = `http://127.0.0.1:${await listen()}`;
   const icon = nativeImage.createFromPath(join(dir, 'iconTemplate.png'));
   icon.setTemplateImage(true);
@@ -107,6 +159,7 @@ app.whenReady().then(async () => {
   tray.on('right-click', () => tray.popUpContextMenu(buildMenu()));
   Menu.setApplicationMenu(Menu.buildFromTemplate([
     { role: 'appMenu' }, { role: 'editMenu' }, { role: 'viewMenu' }, { role: 'windowMenu' },
+    { label: 'Quotas', submenu: [{ label: 'API keys…', accelerator: 'Cmd+,', click: showKeys }] },
   ]));
   createWindow();
   updateTray();

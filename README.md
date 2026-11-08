@@ -126,7 +126,7 @@ Checked 2026-11-08 against the Firecrawl API reference and the Crawl4AI console 
 FIRECRAWL_API_KEY=fc-... CRAWL4AI_API_KEY=sk_live_... npm start     # or put the lines in a gitignored .env (see .env.example): npm start / npm run dev / npm run app load it
 ```
 
-A built `.app` opened from Finder does not see your shell variables: put the same line in `~/Library/Application Support/claude-radar/.env`, or start it from a terminal instead: `FIRECRAWL_API_KEY=fc-... "/Applications/Claude Radar.app/Contents/MacOS/Claude Radar"`.
+In the Mac app, enter the keys in the app instead: menu **Quotas > API keys…** (Cmd+,) or the menu-bar icon's **API keys…**. They are stored encrypted with the macOS Keychain (Electron `safeStorage`) in `~/Library/Application Support/claude-radar/keys.json` (owner-only; nothing is saved if secure storage is unavailable). A saved key overrides `.env` and the environment, and **XÓA** goes back to them. The window can save or clear a key and show whether one is saved; it can never read one back, and the keys never travel over the local HTTP server (which stays GET-only). Alternatively put the same lines in `~/Library/Application Support/claude-radar/.env`, or start the app from a terminal: `FIRECRAWL_API_KEY=fc-... "/Applications/Claude Radar.app/Contents/MacOS/Claude Radar"`.
 
 ### Plan limits from the status line (Claude)
 
