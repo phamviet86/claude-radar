@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createBoardServer } from '../server.js';
 import { SessionReader } from '../lib/read.js';
-import { demoQuotas, writeDemo } from './data.mjs';
+import { writeDemo } from './data.mjs';
 
 const out = join(fileURLToPath(new URL('.', import.meta.url)), '..', 'docs');
 mkdirSync(out, { recursive: true });
@@ -16,7 +16,7 @@ app.on('window-all-closed', () => {}); // stay alive between pictures; the scrip
 
 app.whenReady().then(async () => {
   const reader = new SessionReader(writeDemo(mkdtempSync(join(tmpdir(), 'claude-radar-shots-'))));
-  const server = createBoardServer(reader, Date.now, demoQuotas());
+  const server = createBoardServer(reader);
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   const url = `http://127.0.0.1:${server.address().port}/`;
 

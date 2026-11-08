@@ -9,8 +9,8 @@
     "node": ">=22"
   },
   "scripts": {
-    "start": "node --env-file-if-exists=.env server.js",
-    "dev": "node --watch --env-file-if-exists=.env server.js",
+    "start": "node server.js",
+    "dev": "node --watch server.js",
     "demo": "node demo/run.mjs",
     "screenshots": "electron demo/screenshots.mjs",
     "test": "node --test test/",
@@ -34,9 +34,6 @@
       "lib/**",
       "public/**",
       "desktop/main.js",
-      "desktop/keystore.js",
-      "desktop/keys.html",
-      "desktop/preload.cjs",
       "desktop/*.png",
       "package.json"
     ],

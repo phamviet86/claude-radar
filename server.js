@@ -6,7 +6,6 @@ import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildBoard } from './lib/model.js';
 import { SessionReader } from './lib/read.js';
-import { QuotaService } from './lib/quotas.js';
 
 const PUBLIC = join(fileURLToPath(new URL('.', import.meta.url)), 'public');
 const JSON_TYPE = 'application/json; charset=utf-8';
@@ -22,9 +21,8 @@ const HOST_OK = /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/;
 /**
  * @param {SessionReader} [reader]
  * @param {() => number} [now]
- * @param {QuotaService} [quotas] opt-in quotas panel; makes no network call unless FIRECRAWL_API_KEY is set
  */
-export function createBoardServer(reader = new SessionReader(), now = Date.now, quotas = new QuotaService({ projectsDir: reader.projectsDir })) {
+export function createBoardServer(reader = new SessionReader(), now = Date.now) {
   return createServer(async (req, res) => {
     const send = (/** @type {number} */ code, /** @type {string | Buffer} */ body, type = 'text/plain; charset=utf-8') => {
       res.writeHead(code, {
@@ -50,15 +48,6 @@ export function createBoardServer(reader = new SessionReader(), now = Date.now, 
         return sendJson(200, { ...board, warnings });
       } catch (e) {
         return sendJson(500, { error: 'Could not read the threads.', detail: String(e instanceof Error ? e.message : e) });
-      }
-    }
-
-    if (url.pathname === '/api/quotas') {
-      // cached answers only (see lib/quotas.js): the page polling this never reaches the vendors more than once per TTL
-      try {
-        return sendJson(200, await quotas.get(now()));
-      } catch {
-        return sendJson(500, { error: 'Could not read the quotas.' }); // no detail: it could echo a key
       }
     }
 

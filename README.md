@@ -16,7 +16,7 @@ All pictures in this README use **made-up data** (see [Try it without Claude des
 npm start        # http://127.0.0.1:4848  (change the port: PORT=5000 npm start)
 ```
 
-Requires Node 22 or later. The server listens on `127.0.0.1` only and rejects other Host headers, so thread titles and summaries never leave your machine. By default the server makes **no outbound network calls and reads no API keys**; the one exception is the opt-in [Quotas panel](#quotas-opt-in).
+Requires Node 22 or later. The server listens on `127.0.0.1` only and rejects other Host headers, so thread titles and summaries never leave your machine.
 
 ### Try it without Claude desktop
 
@@ -110,46 +110,13 @@ Then drag `Claude Radar.app` from `dist/` into Applications and open it. The bui
 
 **Troubleshooting.** If macOS asks whether Claude Radar may access data from other apps, allow it: it reads Claude desktop's thread files. If the menu-bar counts show `×`, the built-in server could not be reached; quit and reopen the app.
 
-## Quotas (opt-in)
-
-A thin **footer** at the bottom of the page. Left: Claude's 5-hour and 7-day usage (a bar with percent and reset time when the status line capture is set up; token numbers only otherwise). Right: a used / total bar for Firecrawl and Crawl4AI. In the Mac app a service without a key shows an **ENABLE** button; in a browser it shows "Off" (hover for the variable to set); hover any item for the exact figures. It is the only part of Claude Radar that can make an outbound call, and only when you set a key.
-
-| Provider | What it shows | Needs |
-| --- | --- | --- |
-| Claude | **PLAN**: percent used and reset time of the 5-hour and 7-day windows (as on claude.ai/settings/usage), captured from Claude Code's status line (see below). Without that setup: **ESTIMATE**, the tokens used in the last 5 hours and 7 days summed from your local transcripts (input + output + cache creation; rolling windows, no percentage). | the status-line setup below (no key, no network) |
-| Firecrawl | credits used of the plan (bar) and the billing period end (hover), from `GET https://api.firecrawl.dev/v2/team/credit-usage` | `FIRECRAWL_API_KEY` |
-| Crawl4AI Cloud | spent this month over what the month offered (spent + free left + bought left; the API states no plan limit, so this total is derived), from `GET https://api.crawl4ai.com/v1/billing/balance` (read-only; found in the console's API reference, not on the public docs page). No "low" flag, since there is no known limit. | `CRAWL4AI_API_KEY` |
-
-Checked 2026-11-08 against the Firecrawl API reference and the Crawl4AI console API reference.
-
-```bash
-FIRECRAWL_API_KEY=fc-... CRAWL4AI_API_KEY=sk_live_... npm start     # or put the lines in a gitignored .env (see .env.example): npm start / npm run dev / npm run app load it
-```
-
-In the Mac app, enter the keys in the app instead: press **ENABLE** next to a service in the footer, or use the menu **Quotas > API keys…** (Cmd+,) or the menu-bar icon's **API keys…**. They are stored encrypted with the macOS Keychain (Electron `safeStorage`) in `~/Library/Application Support/claude-radar/keys.json` (owner-only; nothing is saved if secure storage is unavailable). A saved key overrides `.env` and the environment, and **CLEAR** goes back to them. The window can save or clear a key and show whether one is saved; it can never read one back, and the keys never travel over the local HTTP server (which stays GET-only). Alternatively put the same lines in `~/Library/Application Support/claude-radar/.env`, or start the app from a terminal: `FIRECRAWL_API_KEY=fc-... "/Applications/Claude Radar.app/Contents/MacOS/Claude Radar"`.
-
-### Plan limits from the status line (Claude)
-
-Claude has no public endpoint for the plan percentages, but Claude Code passes them to its status line command (`rate_limits.five_hour` and `rate_limits.seven_day`, Pro/Max/Ultra only, after the first API response). `scripts/statusline-capture.mjs` saves just those two windows (percent and reset time, nothing else from the input) to `~/Library/Application Support/claude-radar/usage.json` (owner-only; `CLAUDE_RADAR_USAGE_FILE` overrides) and prints a short line such as `5h 15% · 7d 24%`. Add it to `~/.claude/settings.json` yourself (Claude Radar never edits Claude's settings):
-
-```json
-{ "statusLine": { "type": "command", "command": "node /path/to/claude-radar/scripts/statusline-capture.mjs" } }
-```
-
-If you already have a status line, run your own script and call this one from it, passing the same stdin through. The numbers only move while a Claude Code session is running, so the footer says "STALE" after 30 minutes without an update and "reset, waiting for an update" once a window's reset time has passed. If nothing appears, `usage.json.seen` next to it says whether the script was called at all and which top-level field names it received (never values). API-key sign-in has no `rate_limits`, so the footer stays on the token estimate. **Claude desktop only:** the Code tab runs Claude Code headless (`--output-format stream-json`) and was observed never to call the status line (no marker file appeared), so with only the desktop app installed the footer stays on the token estimate (numbers, no percentage). The capture works when you also use the `claude` CLI in a terminal.
-
-- **Low warning:** for a provider with a known limit (Firecrawl), under 20% remaining shows the text "low" next to its bar and a **LOW** light in the top bar. The menu-bar icon is unchanged.
-- **What leaves your machine:** only the Firecrawl and Crawl4AI balance requests (your key as a Bearer header, to `api.firecrawl.dev` / `api.crawl4ai.com` over HTTPS, 8 s timeout, `GET`, no redirects). The key is read from the environment on the server, never logged, never sent to the page, never written to disk, and errors show fixed phrases only.
-- **No traffic from the page refresh:** the server caches each external answer for **5 minutes** (errors too, no retries); the page asks `/api/quotas` every 15 s and only gets the cached answer. No endpoint that changes spending is ever called (Crawl4AI's `/v1/billing/topup`, `/subscribe` and `/settings` are never touched).
-- `npm run demo` and `npm run screenshots` use a fake key and a fake `fetch` whatever your environment holds; tests use mocks only.
-
 ## Known limits
 
 - "Needs input" and "Done" rely on a summary Claude writes itself after each turn, so they are sometimes wrong.
 - This is Claude's internal format and may change between versions. When it cannot be read, the page shows a warning instead of failing.
 - Only threads on this machine are visible (no SSH or cloud sessions). Multiple Claude configurations are not supported (`CLAUDE_CONFIG_DIR` takes a single directory).
 - Claude's summaries are sometimes truncated or out of step with the last message; the latest message can be long or just "Done.".
-- The board does not show your plan's own usage bars (the 5-hour and weekly limits): Claude has no public endpoint for them. The [Quotas panel](#quotas-opt-in) shows only a local token *estimate*.
+- The board does not show plan usage (the 5-hour and weekly limits) or token counts.
 
 ## Environment variables
 
@@ -158,8 +125,6 @@ If you already have a status line, run your own script and call this one from it
 | `PORT` | Port (default 4848; 4868 for `npm run demo`) |
 | `CLAUDE_RADAR_DESKTOP` | Claude desktop's thread directory; `off` to disable |
 | `CLAUDE_CONFIG_DIR` | Claude Code config directory (default `~/.claude`) |
-| `CLAUDE_RADAR_USAGE_FILE` | Where the status-line capture saves the plan limits (default in the app settings folder) |
-| `FIRECRAWL_API_KEY`, `CRAWL4AI_API_KEY` | Opt-in: turn on the Firecrawl / Crawl4AI credits cards (see [Quotas](#quotas-opt-in)) |
 
 ## Project layout
 
@@ -169,8 +134,6 @@ If you already have a status line, run your own script and call this one from it
 | `lib/model.js` | Pure board model: status of each thread, grouping, day buckets |
 | `lib/read.js` | Reads Claude's files from disk, with caching and warnings |
 | `lib/timeline.js` | Turns a conversation transcript into the work list and the latest message |
-| `scripts/statusline-capture.mjs` | Claude Code status line command that saves the plan limits for the footer |
-| `lib/quotas.js`, `lib/usage.js` | The opt-in Quotas panel: Firecrawl credits (cached call) and the local Claude token estimate |
 | `public/` | The page: `index.html`, `app.js`, `style.css`, bundled fonts and icons |
 | `desktop/` | The Electron wrapper (menu bar icon, window) and the icon scripts |
 | `demo/` | Made-up data, `npm run demo` and the screenshot script |
