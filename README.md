@@ -119,9 +119,8 @@ A thin **footer** at the bottom of the page. Left: Claude's 5-hour and 7-day usa
 | Claude | **THEO GÓI**: percent used and reset time of the 5-hour and 7-day windows (as on claude.ai/settings/usage), captured from Claude Code's status line (see below). Without that setup: **ƯỚC TÍNH**, the tokens used in the last 5 hours and 7 days summed from your local transcripts (input + output + cache creation; rolling windows, no percentage). | the status-line setup below (no key, no network) |
 | Firecrawl | credits used of the plan (bar) and the billing period end (hover), from `GET https://api.firecrawl.dev/v2/team/credit-usage` | `FIRECRAWL_API_KEY` |
 | Crawl4AI Cloud | spent this month over what the month offered (spent + free left + bought left; the API states no plan limit, so this total is derived), from `GET https://api.crawl4ai.com/v1/billing/balance` (read-only; found in the console's API reference, not on the public docs page). No "sắp hết" flag, since there is no known limit. | `CRAWL4AI_API_KEY` |
-| Perplexity | **không khả dụng** (checked 2026-11-08): no balance API; the card links to the billing page of the console | - |
 
-Checked 2026-11-08 against the Firecrawl API reference, the Crawl4AI console API reference and the Perplexity docs.
+Checked 2026-11-08 against the Firecrawl API reference and the Crawl4AI console API reference.
 
 ```bash
 FIRECRAWL_API_KEY=fc-... CRAWL4AI_API_KEY=sk_live_... npm start     # or put the lines in a gitignored .env (see .env.example): npm start / npm run dev / npm run app load it

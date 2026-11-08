@@ -34,7 +34,7 @@ test('no key: no network call, firecrawl needs-key, fixed cards for the rest', a
   const out = await q.get(NOW);
   assert.equal(m.calls.length, 0);
   assert.equal(out.enabled, false);
-  assert.deepEqual(out.providers.map((p) => [p.id, p.state]), [['claude', 'estimate'], ['firecrawl', 'needs-key'], ['crawl4ai', 'needs-key'], ['perplexity', 'unavailable']]);
+  assert.deepEqual(out.providers.map((p) => [p.id, p.state]), [['claude', 'estimate'], ['firecrawl', 'needs-key'], ['crawl4ai', 'needs-key']]);
   assert.equal(out.providers[1].env, 'FIRECRAWL_API_KEY');
   assert.equal(out.low, false);
 });
@@ -154,7 +154,7 @@ test('server: /api/quotas is GET-only JSON from the cache and never carries the 
     const text = await r.text();
     assert.equal(r.status, 200);
     assert.equal(text.includes(KEY), false);
-    assert.equal(JSON.parse(text).providers.length, 4);
+    assert.equal(JSON.parse(text).providers.length, 3);
     await fetch(`${base}/api/quotas`);
     assert.equal(m.calls.length, 1);
     assert.equal((await fetch(`${base}/api/quotas`, { method: 'POST' })).status, 405);
