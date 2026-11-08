@@ -10,10 +10,13 @@ import { extractRateLimits, usageFile } from '../lib/usage.js';
 try {
   let raw = '';
   for await (const chunk of process.stdin) raw += chunk;
-  const lim = extractRateLimits(JSON.parse(raw));
+  const input = JSON.parse(raw);
+  const lim = extractRateLimits(input);
+  const file = usageFile();
+  mkdirSync(dirname(file), { recursive: true });
+  // a "was called" marker for troubleshooting: when, and the NAMES of the top-level fields received (never their values)
+  writeFileSync(`${file}.seen`, JSON.stringify({ at: Date.now(), hasRateLimits: Boolean(lim), fields: Object.keys(input ?? {}) }), { mode: 0o600 });
   if (lim) {
-    const file = usageFile();
-    mkdirSync(dirname(file), { recursive: true });
     const tmp = `${file}.${process.pid}.tmp`;
     writeFileSync(tmp, JSON.stringify({ version: 1, at: Date.now(), fiveHour: lim.fiveHour, week: lim.week }), { mode: 0o600 });
     renameSync(tmp, file);

@@ -253,6 +253,9 @@ test('statusline-capture script: saves only the rate limits, prints a short line
     assert.equal(text.includes('secret-id') || text.includes('/private/path'), false);
     assert.equal(JSON.parse(text).fiveHour.percent, 15);
     assert.equal(statSync(file).mode & 0o077, 0); // owner only
+    const seen = JSON.parse(readFileSync(`${file}.seen`, 'utf8'));
+    assert.deepEqual([seen.hasRateLimits, seen.fields.includes('rate_limits')], [true, true]);
+    assert.equal(JSON.stringify(seen).includes('secret-id'), false); // names only, never values
     for (const bad of ['', 'not json', '{}', JSON.stringify({ rate_limits: {} })]) {
       const b = run(bad);
       assert.equal(b.status, 0);
