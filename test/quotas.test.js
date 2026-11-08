@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { QuotaService, shapeFirecrawl, redact, FIRECRAWL_URL } from '../lib/quotas.js';
+import { QuotaService, shapeFirecrawl, shapeCrawl4ai, redact, FIRECRAWL_URL, CRAWL4AI_URL } from '../lib/quotas.js';
 import { ClaudeUsage, parseUsage, windows, FIVE_HOURS } from '../lib/usage.js';
 import { SessionReader } from '../lib/read.js';
 import { createBoardServer } from '../server.js';
@@ -11,6 +11,7 @@ import { createBoardServer } from '../server.js';
 const NOW = Date.parse('2026-11-08T12:00:00Z');
 const KEY = 'fc-secret-key-123';
 const claude = { estimate: () => ({ fiveHour: 10, week: 100, warnings: [] }) };
+const c4Body = { allowance_mc: 2500000, credit: '0.00', credit_mc: 5000, free: '1000.00', free_mc: 1000000, free_period: '2026-11', spend_month_mc: 1500, tier: 'community', topups: 0, recharge: {} };
 const okBody = { success: true, data: { remainingCredits: 150, planCredits: 1000, billingPeriodStart: '2026-11-01T00:00:00Z', billingPeriodEnd: '2026-12-01T00:00:00Z' } };
 
 /** @param {(url: string, init: RequestInit) => Promise<Response>} fn */
@@ -30,7 +31,7 @@ test('no key: no network call, firecrawl needs-key, fixed cards for the rest', a
   const out = await q.get(NOW);
   assert.equal(m.calls.length, 0);
   assert.equal(out.enabled, false);
-  assert.deepEqual(out.providers.map((p) => [p.id, p.state]), [['claude', 'estimate'], ['firecrawl', 'needs-key'], ['crawl4ai', 'unavailable'], ['perplexity', 'unavailable']]);
+  assert.deepEqual(out.providers.map((p) => [p.id, p.state]), [['claude', 'estimate'], ['firecrawl', 'needs-key'], ['crawl4ai', 'needs-key'], ['perplexity', 'unavailable']]);
   assert.equal(out.providers[1].env, 'FIRECRAWL_API_KEY');
   assert.equal(out.low, false);
 });
@@ -157,4 +158,40 @@ test('server: /api/quotas is GET-only JSON from the cache and never carries the 
   } finally {
     server.close();
   }
+});
+
+test('crawl4ai: GET balance only, mc converted to credits, no low flag, no other route called', async () => {
+  const m = mock(async (url) => (url === CRAWL4AI_URL ? json(c4Body) : json(okBody)));
+  const q = new QuotaService({ env: { CRAWL4AI_API_KEY: 'sk_live_secret' }, fetch: m.f, claude });
+  const out = await q.get(NOW);
+  assert.equal(m.calls.length, 1); // firecrawl has no key: only crawl4ai is called
+  assert.equal(m.calls[0].url, 'https://api.crawl4ai.com/v1/billing/balance');
+  assert.equal(m.calls[0].init.method, 'GET');
+  assert.equal(/** @type {any} */ (m.calls[0].init.headers).Authorization, 'Bearer sk_live_secret');
+  const c = out.providers[2];
+  assert.deepEqual(c.rows, [{ label: 'Free credits (2026-11)', value: '1,000' }, { label: 'Bought credits', value: '5' }, { label: 'Spent this month', value: '1.5' }]);
+  assert.equal(c.remaining, 1005);
+  assert.equal(c.low, undefined);
+  assert.equal(out.enabled, true);
+  assert.equal(out.providers[1].state, 'needs-key');
+  assert.equal(JSON.stringify(out).includes('sk_live_secret'), false);
+});
+
+test('crawl4ai: errors and odd bodies are cached error cards without the key', async () => {
+  const m = mock(async () => json({ detail: 'sk_live_secret' }, 500));
+  const q = new QuotaService({ env: { CRAWL4AI_API_KEY: 'sk_live_secret' }, fetch: m.f, claude });
+  const a = await q.get(NOW);
+  await q.get(NOW + 1000);
+  assert.equal(m.calls.length, 1);
+  assert.equal(a.providers[2].state, 'error');
+  assert.equal(JSON.stringify(a).includes('sk_live_secret'), false);
+  assert.equal(shapeCrawl4ai({ free_mc: 'x' }, NOW).state, 'error');
+});
+
+test('both keys set: each provider is called once, in parallel, and cached separately', async () => {
+  const m = mock(async (url) => (url === CRAWL4AI_URL ? json(c4Body) : json(okBody)));
+  const q = new QuotaService({ env: { FIRECRAWL_API_KEY: KEY, CRAWL4AI_API_KEY: 'sk_live_secret' }, fetch: m.f, claude });
+  await Promise.all([q.get(NOW), q.get(NOW)]);
+  await q.get(NOW + 5000);
+  assert.deepEqual(m.calls.map((c) => c.url).sort(), [CRAWL4AI_URL, FIRECRAWL_URL].sort());
 });

@@ -25,7 +25,7 @@
     head.append(el('b', '', p.label), el('span', 'qstate', STATE[p.state] || p.state));
     if (p.low) head.append(el('span', 'qlow', 'sắp hết'));
     c.append(head);
-    if (p.state === 'ok') {
+    if (p.state === 'ok' && p.limit !== undefined) {
       c.append(el('div', 'qnum', `${fmt(p.remaining)} / ${fmt(p.limit)} ${p.unit} còn lại`));
       if (p.limit > 0) {
         const bar = el('div', 'qbar');
@@ -36,6 +36,7 @@
       }
       if (p.periodEnd) c.append(el('div', 'qnote', `Kỳ thanh toán đến ${new Date(p.periodEnd).toLocaleDateString('en-GB')}`));
     }
+    for (const r of p.rows || []) c.append(el('div', 'qnum', `${r.label}: ${r.value} ${p.unit}`));
     for (const w of p.windows || []) c.append(el('div', 'qnum', `${w.label}: ${fmt(w.used)} ${p.unit} đã dùng`));
     if (p.state === 'needs-key') c.append(el('div', 'qnote', `Đặt biến môi trường ${p.env} rồi khởi động lại.`));
     else if (p.note) c.append(el('div', 'qnote', p.note));

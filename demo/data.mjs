@@ -149,10 +149,11 @@ export function writeDemo(dir, now = Date.now(), pid = process.pid) {
  * The demo never reads your environment and never touches the network, whatever keys you have set.
  */
 export function demoQuotas() {
+  const c4 = { credit: '0.00', credit_mc: 0, free: '1774.00', free_mc: 1774000, free_period: '2026-11', spend_month_mc: 226000, tier: 'community' };
   const body = { success: true, data: { remainingCredits: 130, planCredits: 1000, billingPeriodStart: '2026-11-01T00:00:00Z', billingPeriodEnd: '2026-12-01T00:00:00Z' } };
   return new QuotaService({
-    env: { FIRECRAWL_API_KEY: 'demo-not-a-key' },
-    fetch: /** @type {any} */ (async () => new Response(JSON.stringify(body), { status: 200 })),
+    env: { FIRECRAWL_API_KEY: 'demo-not-a-key', CRAWL4AI_API_KEY: 'demo-not-a-key' },
+    fetch: /** @type {any} */ (async (/** @type {string} */ url) => new Response(JSON.stringify(url.includes('crawl4ai') ? c4 : body), { status: 200 })),
     claude: { estimate: () => ({ fiveHour: 412_000, week: 6_850_000, warnings: [] }) },
   });
 }
