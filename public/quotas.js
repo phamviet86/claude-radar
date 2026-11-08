@@ -16,17 +16,41 @@
   };
   const fmt = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}k` : String(Math.round(n)));
 
-  // left block: Claude, one row per window (numbers only: no plan limit is known)
+  // "13:40" today, "Mon 02:00" later
+  function when(epochSec) {
+    const d = new Date(epochSec * 1000);
+    const hm = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    return d.toDateString() === new Date().toDateString() ? hm : `${d.toLocaleDateString('en-GB', { weekday: 'short' })} ${hm}`;
+  }
+  const ago = (ms) => (ms < 90e3 ? 'vừa xong' : ms < 3600e3 ? `${Math.round(ms / 60e3)} phút trước` : `${Math.round(ms / 3600e3)} giờ trước`);
+
+  // left block: Claude. With captured plan limits: a bar with percent used and the reset time per window, as on claude.ai.
+  // Without them: token numbers only (the plan limit itself is not public, so no bar).
   function claude(p) {
     const b = el('div', 'qblock qleft');
-    b.title = p.note || '';
     const t = el('div', 'qtitle');
-    t.append(el('b', '', 'CLAUDE'), el('span', 'qsub', 'ƯỚC TÍNH'));
+    t.append(el('b', '', 'CLAUDE'));
+    const stale = p.plan && Date.now() - p.plan.at > 30 * 60e3;
+    t.append(el('span', 'qsub', p.plan ? (stale ? 'THEO GÓI · CŨ' : 'THEO GÓI') : 'ƯỚC TÍNH'));
     b.append(t);
-    for (const w of p.windows || []) {
-      const row = el('div', 'qrow');
-      row.title = `${w.label}: ${Math.round(w.used).toLocaleString('en-US')} ${p.unit} đã dùng`;
-      row.append(el('span', 'qk', w.label.includes('5') ? '5H' : '7D'), el('b', 'qv', fmt(w.used)), el('span', 'qk', 'tokens'));
+    const tokens = new Map((p.windows || []).map((w) => [w.label.includes('5') ? '5H' : '7D', w.used]));
+    b.title = p.plan ? `Cập nhật ${ago(Date.now() - p.plan.at)} từ status line của Claude Code. Tokens (ước tính): 5H ${fmt(tokens.get('5H') || 0)}, 7D ${fmt(tokens.get('7D') || 0)}` : p.note || '';
+    const rows = p.plan ? [['5H', p.plan.fiveHour], ['7D', p.plan.week]] : [['5H', null], ['7D', null]];
+    for (const [key, w] of rows) {
+      const row = el('div', w ? 'qrow qplan' : 'qrow');
+      row.append(el('span', 'qk', key));
+      if (w && !w.reset) {
+        const bar = el('span', 'qbar');
+        const fill = el('i');
+        fill.style.width = `${Math.max(0, Math.min(100, w.percent))}%`;
+        bar.append(fill);
+        row.append(bar, el('b', 'qv', `${Math.round(w.percent)}%`), el('span', 'qk', `reset ${when(w.resetsAt)}`));
+        row.dataset.high = String(w.percent >= 80);
+      } else if (w) {
+        row.append(el('span', 'qoff', 'đã reset, chờ cập nhật'));
+      } else {
+        row.append(el('b', 'qv', fmt(tokens.get(key) || 0)), el('span', 'qk', 'tokens'));
+      }
       b.append(row);
     }
     return b;

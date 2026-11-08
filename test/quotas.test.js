@@ -4,7 +4,10 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, utimesSync } from 'node:
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { QuotaService, shapeFirecrawl, shapeCrawl4ai, redact, FIRECRAWL_URL, CRAWL4AI_URL } from '../lib/quotas.js';
-import { ClaudeUsage, parseUsage, windows, FIVE_HOURS } from '../lib/usage.js';
+import { ClaudeUsage, parseUsage, windows, FIVE_HOURS, extractRateLimits, readLimits, usageFile } from '../lib/usage.js';
+import { spawnSync } from 'node:child_process';
+import { readFileSync, statSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { SessionReader } from '../lib/read.js';
 import { createBoardServer } from '../server.js';
 
@@ -195,4 +198,68 @@ test('both keys set: each provider is called once, in parallel, and cached separ
   await Promise.all([q.get(NOW), q.get(NOW)]);
   await q.get(NOW + 5000);
   assert.deepEqual(m.calls.map((c) => c.url).sort(), [CRAWL4AI_URL, FIRECRAWL_URL].sort());
+});
+
+test('plan limits: extractRateLimits keeps only the two windows and ignores odd input', () => {
+  const lim = extractRateLimits({ model: 'x', rate_limits: { five_hour: { used_percentage: 15.2, resets_at: 1000 }, seven_day: { used_percentage: 24, resets_at: 2000 }, other: 1 } });
+  assert.deepEqual(lim, { fiveHour: { percent: 15.2, resetsAt: 1000 }, week: { percent: 24, resetsAt: 2000 } });
+  assert.equal(extractRateLimits({}), null);
+  assert.equal(extractRateLimits({ rate_limits: { five_hour: { used_percentage: 'x' } } }), null);
+  assert.deepEqual(extractRateLimits({ rate_limits: { five_hour: { used_percentage: 5, resets_at: 9 } } })?.week, null);
+});
+
+test('plan limits: usageFile follows the platform and the override', () => {
+  assert.equal(usageFile({}, 'darwin', '/h'), '/h/Library/Application Support/claude-radar/usage.json');
+  assert.equal(usageFile({ XDG_CONFIG_HOME: '/c' }, 'linux', '/h'), '/c/claude-radar/usage.json');
+  assert.equal(usageFile({ CLAUDE_RADAR_USAGE_FILE: '/x/u.json' }, 'darwin', '/h'), '/x/u.json');
+});
+
+test('plan limits: readLimits marks a window whose reset time has passed; missing or broken file gives null', () => {
+  const root = mkdtempSync(join(tmpdir(), 'claude-radar-lim-'));
+  try {
+    const f = join(root, 'usage.json');
+    assert.equal(readLimits(f, NOW), null);
+    writeFileSync(f, '{broken');
+    assert.equal(readLimits(f, NOW), null);
+    writeFileSync(f, JSON.stringify({ at: 5, fiveHour: { percent: 15, resetsAt: NOW / 1000 + 3600 }, week: { percent: 24, resetsAt: NOW / 1000 - 10 } }));
+    const l = readLimits(f, NOW);
+    assert.deepEqual([l?.fiveHour?.reset, l?.week?.reset, l?.at], [false, true, 5]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('plan limits: the Claude card shows them (state ok), tokens stay as the estimate', async () => {
+  const plan = { at: NOW - 1000, fiveHour: { percent: 15, resetsAt: NOW / 1000 + 600, reset: false }, week: { percent: 24, resetsAt: NOW / 1000 + 9999, reset: false } };
+  const withPlan = await new QuotaService({ env: {}, claude, limits: () => plan }).get(NOW);
+  assert.equal(withPlan.providers[0].state, 'ok');
+  assert.equal(withPlan.providers[0].plan?.fiveHour?.percent, 15);
+  assert.equal(withPlan.providers[0].windows?.length, 2);
+  const without = await new QuotaService({ env: {}, claude, limits: () => null }).get(NOW);
+  assert.equal(without.providers[0].state, 'estimate');
+  assert.equal(without.providers[0].plan, undefined);
+});
+
+test('statusline-capture script: saves only the rate limits, prints a short line, never breaks on odd input', () => {
+  const root = mkdtempSync(join(tmpdir(), 'claude-radar-cap-'));
+  const script = fileURLToPath(new URL('../scripts/statusline-capture.mjs', import.meta.url));
+  const file = join(root, 'sub', 'usage.json');
+  const run = (/** @type {string} */ input) => spawnSync(process.execPath, [script], { input, env: { ...process.env, CLAUDE_RADAR_USAGE_FILE: file }, encoding: 'utf8' });
+  try {
+    const r = run(JSON.stringify({ session_id: 'secret-id', cwd: '/private/path', rate_limits: { five_hour: { used_percentage: 15, resets_at: 100 }, seven_day: { used_percentage: 24.4, resets_at: 200 } } }));
+    assert.equal(r.status, 0);
+    assert.equal(r.stdout, '5h 15% · 7d 24%');
+    const text = readFileSync(file, 'utf8');
+    assert.equal(text.includes('secret-id') || text.includes('/private/path'), false);
+    assert.equal(JSON.parse(text).fiveHour.percent, 15);
+    assert.equal(statSync(file).mode & 0o077, 0); // owner only
+    for (const bad of ['', 'not json', '{}', JSON.stringify({ rate_limits: {} })]) {
+      const b = run(bad);
+      assert.equal(b.status, 0);
+      assert.equal(b.stdout, '');
+    }
+    assert.equal(JSON.parse(readFileSync(file, 'utf8')).week.percent, 24.4); // a payload without limits does not wipe the last capture
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

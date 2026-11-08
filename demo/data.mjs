@@ -155,5 +155,6 @@ export function demoQuotas() {
     env: { FIRECRAWL_API_KEY: 'demo-not-a-key', CRAWL4AI_API_KEY: 'demo-not-a-key' },
     fetch: /** @type {any} */ (async (/** @type {string} */ url) => new Response(JSON.stringify(url.includes('crawl4ai') ? c4 : body), { status: 200 })),
     claude: { estimate: () => ({ fiveHour: 412_000, week: 6_850_000, warnings: [] }) },
+    limits: (/** @type {number} */ now) => ({ at: now - 120_000, fiveHour: { percent: 15, resetsAt: Math.floor(now / 1000) + 3 * 3600, reset: false }, week: { percent: 24, resetsAt: Math.floor(now / 1000) + 4 * 86400, reset: false } }),
   });
 }

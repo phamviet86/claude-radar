@@ -493,6 +493,9 @@ body { padding-bottom: 66px; }
 .qleft .qtitle b { color: var(--fg); letter-spacing: .14em; font-weight: 600; }
 .qsub { color: var(--faint); font-size: 10px; letter-spacing: .12em; }
 .qleft .qrow { display: flex; align-items: baseline; gap: 7px; }
+.qleft .qplan { display: grid; grid-template-columns: 22px 110px 38px auto; align-items: center; gap: 8px; }
+.qleft .qplan .qv { text-align: right; }
+.qplan[data-high="true"] .qbar i { background: var(--input-bar); }
 .qright { justify-self: end; width: min(100%, 520px); }
 .qsvc { display: grid; grid-template-columns: 74px minmax(60px, 1fr) 96px 58px; align-items: center; gap: 10px; }
 .qrow .qk { color: var(--faint); letter-spacing: .1em; }
@@ -506,6 +509,7 @@ body { padding-bottom: 66px; }
 .qoff { grid-column: 2 / -1; color: var(--faint); }
 @media (max-width: 640px) {
   body { padding-bottom: 104px; }
+  .qleft .qplan { grid-template-columns: 22px minmax(40px, 1fr) 38px auto; }
   .qfoot { grid-template-columns: 1fr; gap: 6px; }
   .qleft { padding: 0 0 6px; border-right: 0; border-bottom: 1px solid var(--line); }
   .qright { justify-self: stretch; width: auto; }
